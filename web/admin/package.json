@@ -1,0 +1,60 @@
+{
+  "name": "vue-naive-admin",
+  "type": "module",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint:fix": "eslint --fix",
+    "postinstall": "npx simple-git-hooks",
+    "up": "taze major -I"
+  },
+  "dependencies": {
+    "@arco-design/color": "^0.4.0",
+    "@vueuse/core": "^14.2.1",
+    "axios": "^1.16.1",
+    "dayjs": "^1.11.21",
+    "echarts": "^6.1.0",
+    "lodash-es": "^4.18.1",
+    "naive-ui": "^2.44.1",
+    "pinia": "^3.0.4",
+    "pinia-plugin-persistedstate": "^4.7.1",
+    "vue": "^3.5.35",
+    "vue-echarts": "^8.0.1",
+    "vue-router": "^5.1.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@antfu/eslint-config": "^9.0.0",
+    "@iconify/json": "^2.2.481",
+    "@unocss/eslint-config": "^66.7.0",
+    "@unocss/eslint-plugin": "^66.7.0",
+    "@unocss/preset-rem-to-px": "^66.7.0",
+    "@vitejs/plugin-vue": "^6.0.7",
+    "@vitejs/plugin-vue-jsx": "^5.1.5",
+    "eslint": "^10.4.1",
+    "eslint-plugin-format": "^2.0.1",
+    "esno": "^4.8.0",
+    "fs-extra": "^11.3.5",
+    "glob": "^13.0.6",
+    "lint-staged": "^17.0.7",
+    "rollup-plugin-visualizer": "^7.0.1",
+    "simple-git-hooks": "^2.13.1",
+    "taze": "^19.14.1",
+    "unocss": "^66.7.0",
+    "unplugin-auto-import": "^21.0.0",
+    "unplugin-vue-components": "^32.1.0",
+    "vite": "^8.0.14",
+    "vite-plugin-router-warn": "^2.0.0",
+    "vite-plugin-vue-devtools": "^8.1.2",
+    "vue3-intro-step": "^1.0.5"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "npx lint-staged"
+  },
+  "lint-staged": {
+    "*": "eslint --fix"
+  }
+}

@@ -22,10 +22,23 @@
   export DOTNET_ROOT="$HOME/.dotnet"; export PATH="$HOME/.dotnet:$PATH"
   ```
   `C:\Program Files\dotnet` 只有 8.0 运行时、无 SDK,**不要用**。项目根有 `global.json` 固定 10.0.400。
-- **没有 MSVC 链接器、没有 Docker、没有 WSL** → Native AOT 在本机只能跑到 ILC 编译阶段(`dotnet publish -r win-arm64 -p:PublishAot=true` 会在 link 阶段报 "Platform linker not found",这是预期);跨 OS AOT 不受支持。因此:
+- **没有 MSVC 链接器、没有 Docker、没有 WSL** → Native AOT 在本机只能跑到 ILC 编译阶段;跨 OS AOT 不受支持。因此:
   - Agent 的 AOT 正确性靠:`PublishAot=true` + `IsAotCompatible=true` + `EnableTrimAnalyzer/EnableAotAnalyzer/EnableSingleFileAnalyzer` 构建 **零警告**,以及 ILC 阶段无错误。
+  - ILC 验证命令(已实测可绕过链接器探测,ILC 会真正执行,最后 `link` 步骤失败是预期,ILC 阶段的 IL 警告/错误以此为准):
+    ```bash
+    dotnet publish src/SNM.Agent -c Release -r win-arm64 -p:PublishAot=true -p:IlcUseEnvironmentalTools=true -p:TrimmerSingleWarn=false
+    ```
   - 功能验证用 JIT(`dotnet run`)。
   - 真正的 AOT 二进制交给 `deploy/.github/workflows/agent-aot.yml`(GitHub Actions,ubuntu/windows runner)。
+- **已实测的 AOT 事实(2026-09-06,SDK 10.0.400 / 包 10.0.11)**:
+  - `HubConnectionBuilder().WithUrl(...).Build()` 在 AOT 分析器下 **0 警告**(SignalR .NET 客户端本身 AOT 友好)。
+  - `AddMessagePackProtocol()` 触发 **IL2026**:该方法标注 `[RequiresUnreferencedCode("MessagePack does not currently support trimming or native AOT.")]`。官方 `Microsoft.AspNetCore.SignalR.Protocols.MessagePack` 内部对参数用非泛型 `MessagePackSerializer.Serialize(Type, ...)` / `Deserialize(Type, ...)`,而 MessagePack 2.5 的非泛型路径依赖 `MakeGenericMethod` + `Expression.Compile()`(AOT 下只能靠解释器,且带 byref 参数),**不能作为 Agent 的方案直接使用**。
+  - 候选路径(研究阶段必须用 spike 实证并定案):
+    1. **在 `SNM.Contracts` 中 vendoring 一份 MIT 许可的 `MessagePackHubProtocolWorker`(dotnet/aspnetcore `release/10.0` 分支 `src/SignalR/common/Protocols.MessagePack/src/Protocol/MessagePackHubProtocolWorker.cs` 及其依赖的 `BinaryMessageParser/BinaryMessageFormatter` 等 shared 源码),实现自己的 `IHubProtocol`(Name 仍为 `messagepack`、Version 与官方一致、线格式完全兼容),`SerializeArgument/DeserializeObject` 改为对已知类型做静态 type-switch + 手写 `IMessagePackFormatter<T>`,完全不走反射/动态代码。Master 与浏览器继续用官方包。** 这是编排者倾向的方案。
+    2. 官方协议包 + `StaticCompositeResolver` + 泛型 rooting + `UnconditionalSuppressMessage`(运行时行为无法在本机验证,风险高)。
+    3. 其他(需说明)。
+  - 无论哪条路径,都必须在 JIT 下用集成测试证明:Agent 侧协议 ⇄ Master 侧官方 MessagePack 协议 互通,且 DTO 字节序列与 `[MessagePackObject]/[Key]` 契约完全一致。
+  - **ILC 实测**(上面的 ILC 验证命令,对"SignalR 客户端 + `AddMessagePackProtocol()`"的最小程序):ILC 正常生成 `*.obj`;`TrimmerSingleWarn=false` 下共 ~60 条 IL3050/IL2060/IL2070/IL2091 警告,**全部来自 MessagePack.dll 内部**的 `DynamicObjectResolver`/`DynamicUnionResolver`/`DynamicGenericResolver`/`DynamicEnumAsStringResolver`/`AttributeFormatterResolver`/`BuiltinResolverGetFormatterHelper`/`FormatterResolverExtensions.GetFormatterDynamic`/`MessagePackSecurity.ObjectFallbackEqualityComparer`(Reflection.Emit、`MakeGenericType/Method`)。结论:只要 Agent 代码路径**不引用** `MessagePackSerializer`/`StandardResolver`/`GetFormatterDynamic` 等动态入口(只用 `MessagePackWriter`/`MessagePackReader` + 手写 formatter),这些代码会被裁掉、警告消失。Agent 的验收口径:ILC 输出(`TrimmerSingleWarn=false`)**0 条 IL 警告**。
 - Node v22.22 / npm 10.9;**无 pnpm**(需要可 `npm i -g pnpm` 或 `corepack enable`),无 jq。
 - 网络全部可达:nuget.org、registry.npmjs.org、github.com(git clone 正常)、cdn.jsdelivr.net。
 - 4 核 → 并行 agent 上限 2;每个实现 agent 必须自给自足、自己验证。
