@@ -1,0 +1,16 @@
+services:
+  snm-master:
+    image: ghcr.io/OWNER/snm-master:latest
+    # or build locally:  build: { context: ../.., dockerfile: deploy/docker/Dockerfile }
+    container_name: snm-master
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5080:5080"          # keep the host's Nginx / 1Panel in front for TLS
+    environment:
+      SNM_ADMIN_USER: admin
+      SNM_ADMIN_PASSWORD: ChangeMe-Now-2026!   # first start only
+      SNM_PUBLIC_BASE_URL: https://m.example.com
+      SNM_TIMEZONE: Asia/Shanghai
+      # SNM_JWT_SECRET: "<64+ random characters>"
+    volumes:
+      - ./data:/data                   # chown 1654:1654 ./data  (the image runs as the non-root "app" user)

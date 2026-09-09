@@ -1,0 +1,91 @@
+name: agent-aot
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+    paths: [ 'src/SNM.Agent/**', 'src/SNM.Contracts/**', 'Directory.*.props', 'global.json', '.github/workflows/agent-aot.yml' ]
+  pull_request:
+    paths: [ 'src/SNM.Agent/**', 'src/SNM.Contracts/**', 'Directory.*.props', 'global.json' ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: publish ${{ matrix.rid }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-22.04,     rid: linux-x64,   ext: tar.gz }
+          - { os: ubuntu-22.04-arm, rid: linux-arm64, ext: tar.gz }
+          - { os: windows-2022,     rid: win-x64,     ext: zip }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Install native toolchain (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends clang zlib1g-dev
+
+      - name: Resolve version
+        id: ver
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"; else echo "version=0.0.0-ci.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Publish Native AOT (zero IL warnings gate)
+        shell: bash
+        run: |
+          set -o pipefail
+          dotnet publish src/SNM.Agent/SNM.Agent.csproj -c Release -r ${{ matrix.rid }} -o out/${{ matrix.rid }} \
+            -p:PublishAot=true -p:TrimmerSingleWarn=false -p:Version=${{ steps.ver.outputs.version }} \
+            2>&1 | tee publish.log
+          if grep -E 'warning IL[0-9]{4}' publish.log; then echo '::error::IL trim/AOT warnings found'; exit 1; fi
+
+      - name: Smoke test
+        shell: bash
+        run: |
+          BIN=$(ls out/${{ matrix.rid }}/snm-agent* | grep -vE '\.(pdb|dbg)$' | head -1)
+          "$BIN" --version
+          "$BIN" test
+          ls -la out/${{ matrix.rid }}
+
+      - name: Package
+        shell: bash
+        run: |
+          cd out/${{ matrix.rid }}
+          rm -f *.pdb *.dbg
+          if [ "${{ matrix.ext }}" = "zip" ]; then 7z a -tzip ../snm-agent-${{ matrix.rid }}.zip snm-agent.exe >/dev/null
+          else tar czf ../snm-agent-${{ matrix.rid }}.tar.gz snm-agent; fi
+          cd ..
+          sha256sum snm-agent-${{ matrix.rid }}.${{ matrix.ext }} > snm-agent-${{ matrix.rid }}.${{ matrix.ext }}.sha256
+          cat snm-agent-${{ matrix.rid }}.${{ matrix.ext }}.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: snm-agent-${{ matrix.rid }}
+          path: out/snm-agent-${{ matrix.rid }}.*
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
