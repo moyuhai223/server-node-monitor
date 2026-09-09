@@ -128,6 +128,7 @@ public sealed class NodeRuntime
     public string RemoteIp;
     public DateTime? BootTimeUtc;
     public bool Registered;
+    public ushort ProcCount;
     /// <summary>Set once per connection when a heartbeat arrives before register (log throttling).</summary>
     public bool WarnedUnregistered;
 

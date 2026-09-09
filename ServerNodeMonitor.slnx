@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/SNM.Contracts/SNM.Contracts.csproj" />
+    <Project Path="src/SNM.Master/SNM.Master.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/SNM.Contracts.Tests/SNM.Contracts.Tests.csproj" />
