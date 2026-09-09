@@ -11,7 +11,7 @@ DATA=$(mktemp -d); export DATA
 PASS=1
 fail() { echo "[e2e] FAIL: $*"; PASS=0; }
 ok() { echo "[e2e] ok: $*"; }
-json() { python3 -c "import sys,json; d=json.load(sys.stdin); print(eval(sys.argv[1]))" "$1"; }
+json() { PY=$(command -v python3 || command -v python); $PY -c "import sys,json; d=json.load(sys.stdin); print(eval(sys.argv[1]))" "$1"; }
 
 dotnet build ServerNodeMonitor.slnx -c Debug -nologo -v q || { echo "[e2e] build failed"; exit 1; }
 
@@ -27,7 +27,7 @@ class H(BaseHTTPRequestHandler):
     def log_message(self, *a): pass
 HTTPServer(('127.0.0.1', port), H).serve_forever()
 EOF
-python3 "$DATA/sink.py" "$DATA/hooks.jsonl" "$SINK_PORT" &
+$(command -v python3 || command -v python) "$DATA/sink.py" "$DATA/hooks.jsonl" "$SINK_PORT" &
 SINK_PID=$!
 SNM_DATA_DIR="$DATA" SNM_LISTEN="$BASE" ASPNETCORE_ENVIRONMENT=Development SNM_GEOIP_ENABLED=false SNM_PUBLIC_BASE_URL="$BASE" SNM_ADMIN_PASSWORD=e2e-password-123 \
   dotnet run --project src/SNM.Master --no-build > "$DATA/master.log" 2>&1 &

@@ -15,6 +15,8 @@ const state = {
 
 const $ = (id) => document.getElementById(id);
 const grid = $('grid');
+let drawAll = false;
+let drawScheduled = false;
 
 // ---------------------------------------------------------------- theme
 function applyTheme(theme) {
@@ -148,7 +150,6 @@ function renderSummary() {
   $('summary').textContent = `在线 ${online} / ${total}`;
 }
 
-let drawAll = false, drawScheduled = false;
 function scheduleDraw(all) {
   if (all) drawAll = true;
   if (drawScheduled) return;

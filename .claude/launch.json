@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "master",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "export DOTNET_ROOT=$HOME/.dotnet PATH=$HOME/.dotnet:$PATH SNM_DATA_DIR=/tmp/snm-preview SNM_LISTEN=http://127.0.0.1:5080 ASPNETCORE_ENVIRONMENT=Development SNM_GEOIP_ENABLED=false SNM_PUBLIC_BASE_URL=http://127.0.0.1:5080 && cd /c/Users/ming/claude/server-node-monitor && dotnet run --project src/SNM.Master --no-build"],
+      "port": 5080
+    }
+  ]
+}

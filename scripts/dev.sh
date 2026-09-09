@@ -33,10 +33,10 @@ KEY_FILE="$DATA/agent.key"
 if [ ! -s "$KEY_FILE" ]; then
   echo "[dev] creating node 'dev-local' and saving its key to $KEY_FILE"
   TOKEN=$(curl -fsS -X POST "$BASE/api/auth/login" -H 'Content-Type: application/json' \
-    -d "{\"username\":\"admin\",\"password\":\"$ADMIN_PASSWORD\"}" | python3 -c 'import sys,json; print(json.load(sys.stdin)["data"]["accessToken"])')
+    -d "{\"username\":\"admin\",\"password\":\"$ADMIN_PASSWORD\"}" | $(command -v python3 || command -v python) -c 'import sys,json; print(json.load(sys.stdin)["data"]["accessToken"])')
   curl -fsS -X POST "$BASE/api/nodes" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
     -d '{"publicName":"dev-local","adminRemark":"scripts/dev.sh","traffic":{"limitBytes":1000000000000}}' \
-    | python3 -c 'import sys,json; print(json.load(sys.stdin)["data"]["agentKey"])' > "$KEY_FILE"
+    | $(command -v python3 || command -v python) -c 'import sys,json; print(json.load(sys.stdin)["data"]["agentKey"])' > "$KEY_FILE"
 fi
 
 echo "[dev] starting agent"

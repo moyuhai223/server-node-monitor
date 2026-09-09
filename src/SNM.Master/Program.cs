@@ -213,8 +213,17 @@ if (devPublic is not null && Directory.Exists(devPublic) && File.Exists(Path.Com
     app.Logger.LogInformation("Serving the public dashboard from {Dir} (development)", devPublic);
 }
 app.UseDefaultFiles();
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        var p = ctx.Context.Request.Path.Value ?? "";
+        ctx.Context.Response.Headers.CacheControl = p.StartsWith("/admin/assets/", StringComparison.Ordinal) ? "public, max-age=31536000, immutable" : "no-cache";
+    },
+});
 
+// Explicit routing AFTER static files: otherwise endpoint matching (SPA fallback) shadows real files.
+app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -230,11 +239,14 @@ SystemEndpoints.Map(app);
 
 var webRoot = app.Environment.WebRootPath ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot");
 if (File.Exists(Path.Combine(webRoot, "admin", "index.html")))
-    app.MapFallbackToFile("/admin/{*path}", "admin/index.html");
+    app.MapFallbackToFile("/admin/{*path:nonfile}", "admin/index.html");
 else
     app.MapFallback("/admin/{*path}", () => Results.Text("管理后台尚未构建:请运行 scripts/build-web.sh 后重启 Master。", "text/plain; charset=utf-8", statusCode: 404));
 app.MapFallback("/api/{**path}", () => Results.Json(ApiResponse.Fail(404, "接口不存在"), ApiJson.Options, statusCode: 404));
-app.MapFallback("/", () => Results.Text("Server Node Monitor: public dashboard not built yet (run scripts/build-web.sh).", "text/plain; charset=utf-8", statusCode: 404));
+// Only register a "/" endpoint when no dashboard exists: a matched endpoint makes the static-file middleware skip the request.
+var hasPublicIndex = File.Exists(Path.Combine(webRoot, "index.html")) || (devPublic is not null && File.Exists(Path.Combine(devPublic, "index.html")));
+if (!hasPublicIndex)
+    app.MapGet("/", () => Results.Text("Server Node Monitor: public dashboard not built yet (run scripts/build-web.sh).", "text/plain; charset=utf-8", statusCode: 404));
 
 // ---- 6. blocking initialisation: migrate, seed, load memory state (idempotent; also a hosted service for test hosts)
 await app.Services.GetRequiredService<StartupInitializer>().EnsureInitializedAsync(app.Lifetime.ApplicationStopping);
