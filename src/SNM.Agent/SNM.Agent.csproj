@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>snm-agent</AssemblyName>
+    <RootNamespace>SNM.Agent</RootNamespace>
+    <Description>Server Node Monitor probe: stateless, read-only, no listening ports, no remote execution, no self-update.</Description>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- Native AOT contract (docs/PROTOCOL.md 7.11): zero IL2xxx/IL3xxx warnings, verified by ILC in CI. -->
+    <PublishAot>true</PublishAot>
+    <IsAotCompatible>true</IsAotCompatible>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+    <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
+    <TrimmerSingleWarn>false</TrimmerSingleWarn>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <UseSystemResourceKeys>true</UseSystemResourceKeys>
+    <EventSourceSupport>false</EventSourceSupport>
+    <HttpActivityPropagationSupport>false</HttpActivityPropagationSupport>
+    <MetadataUpdaterSupport>false</MetadataUpdaterSupport>
+    <DebuggerSupport>false</DebuggerSupport>
+    <StackTraceSupport>true</StackTraceSupport>
+    <OptimizationPreference>Size</OptimizationPreference>
+    <StripSymbols>true</StripSymbols>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <TieredPGO>false</TieredPGO>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" />
+    <ProjectReference Include="..\SNM.Contracts\SNM.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="SNM.Agent.Tests" />
+  </ItemGroup>
+
+</Project>

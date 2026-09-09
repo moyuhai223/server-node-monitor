@@ -60,14 +60,20 @@ public sealed class NotificationDispatcher(IDbContextFactory<SnmDbContext> dbFac
     /// <summary>Retry back-off; shortened by tests.</summary>
     public TimeSpan[] RetryDelays { get; set; } = [TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(120)];
 
-    public int Pending => _queue.Reader.Count;
+    private int _pending;
 
-    public void Enqueue(NotificationJob job) => _queue.Writer.TryWrite(job);
+    public int Pending => Volatile.Read(ref _pending);
+
+    public void Enqueue(NotificationJob job)
+    {
+        if (_queue.Writer.TryWrite(job)) Interlocked.Increment(ref _pending);
+    }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await foreach (var job in _queue.Reader.ReadAllAsync(stoppingToken))
         {
+            Interlocked.Decrement(ref _pending);
             try { await DeliverAsync(job, stoppingToken); }
             catch (OperationCanceledException) { throw; }
             catch (Exception ex) { logger.LogError(ex, "Delivery of event {EventId} failed unexpectedly", job.Event.Id); }

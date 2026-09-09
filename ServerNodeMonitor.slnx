@@ -2,8 +2,11 @@
   <Folder Name="/src/">
     <Project Path="src/SNM.Contracts/SNM.Contracts.csproj" />
     <Project Path="src/SNM.Master/SNM.Master.csproj" />
+    <Project Path="src/SNM.Agent/SNM.Agent.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/SNM.Contracts.Tests/SNM.Contracts.Tests.csproj" />
+    <Project Path="tests/SNM.Agent.Tests/SNM.Agent.Tests.csproj" />
+    <Project Path="tests/SNM.Master.Tests/SNM.Master.Tests.csproj" />
   </Folder>
 </Solution>

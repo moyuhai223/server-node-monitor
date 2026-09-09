@@ -140,8 +140,10 @@ public sealed class RetentionService(IDbContextFactory<SnmDbContext> dbFactory, 
         var total = 0;
         while (true)
         {
-            var n = await db.Database.ExecuteSqlRawAsync($"DELETE FROM {table} WHERE rowid IN (SELECT rowid FROM {table} WHERE {column} < @cutoff LIMIT 5000)",
+#pragma warning disable EF1003 // table/column names are compile-time constants
+            var n = await db.Database.ExecuteSqlRawAsync("DELETE FROM " + table + " WHERE rowid IN (SELECT rowid FROM " + table + " WHERE " + column + " < @cutoff LIMIT 5000)",
                 [new Microsoft.Data.Sqlite.SqliteParameter("@cutoff", cutoff)], ct);
+#pragma warning restore EF1003
             total += n;
             if (n < 5000) break;
             await Task.Delay(50, ct);

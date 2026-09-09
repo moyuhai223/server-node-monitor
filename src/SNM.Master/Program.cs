@@ -54,6 +54,8 @@ builder.Host.UseSystemd();
 
 // ---- 4. services
 builder.Services.AddSingleton(paths);
+builder.Services.AddSingleton<StartupInitializer>();
+builder.Services.AddHostedService<StartupHostedService>();
 builder.Services.ConfigureHttpJsonOptions(o => ApiJson.Configure(o.SerializerOptions));
 builder.Services.Configure<RouteHandlerOptions>(o => o.ThrowOnBadRequest = true);
 
@@ -232,57 +234,16 @@ else
 app.MapFallback("/api/{**path}", () => Results.Json(ApiResponse.Fail(404, "接口不存在"), ApiJson.Options, statusCode: 404));
 app.MapFallback("/", () => Results.Text("Server Node Monitor: public dashboard not built yet (run scripts/build-web.sh).", "text/plain; charset=utf-8", statusCode: 404));
 
-// ---- 6. blocking initialisation: migrate, seed, load memory state
-await InitializeAsync(app, snm, paths);
+// ---- 6. blocking initialisation: migrate, seed, load memory state (idempotent; also a hosted service for test hosts)
+await app.Services.GetRequiredService<StartupInitializer>().EnsureInitializedAsync(app.Lifetime.ApplicationStopping);
+{
+    var settings = app.Services.GetRequiredService<SettingsService>().Snapshot;
+    app.Logger.LogInformation("Server Node Monitor master {Version} starting: listen={Listen} dataDir={DataDir} db={DbSize:N0} bytes nodes={Nodes} timeZone={Tz} publicBaseUrl={PublicBaseUrl}",
+        AppInfo.Version, snm.Listen, paths.DataDir, paths.DbSizeBytes(), app.Services.GetRequiredService<NodeRegistry>().Count, settings.TimeZoneId,
+        settings.PublicBaseUrl.Length > 0 ? settings.PublicBaseUrl : "(未配置 - 安装脚本需要 site.publicBaseUrl)");
+}
 
 await app.RunAsync();
-
-static async Task InitializeAsync(WebApplication app, SnmOptions snm, DataPaths paths)
-{
-    var logger = app.Logger;
-    var ct = app.Lifetime.ApplicationStopping;
-    var factory = app.Services.GetRequiredService<IDbContextFactory<SnmDbContext>>();
-    var fresh = !File.Exists(paths.DbPath);
-
-    await using (var db = await factory.CreateDbContextAsync(ct))
-    {
-        var conn = db.Database.GetDbConnection();
-        await conn.OpenAsync(ct);
-        await using (var cmd = conn.CreateCommand())
-        {
-            cmd.CommandText = fresh ? "PRAGMA auto_vacuum=INCREMENTAL; PRAGMA journal_mode=WAL;" : "PRAGMA journal_mode=WAL;";
-            await cmd.ExecuteNonQueryAsync(ct);
-        }
-        if (db.Database.GetMigrations().Any())
-        {
-            var pending = (await db.Database.GetPendingMigrationsAsync(ct)).ToList();
-            if (pending.Count > 0) logger.LogInformation("Applying {Count} database migration(s): {Names}", pending.Count, string.Join(", ", pending));
-            await db.Database.MigrateAsync(ct);
-        }
-        else
-        {
-            logger.LogWarning("No EF migrations compiled in; falling back to EnsureCreated (development only)");
-            await db.Database.EnsureCreatedAsync(ct);
-        }
-        await using (var cmd = conn.CreateCommand())
-        {
-            cmd.CommandText = "PRAGMA quick_check;";
-            var result = (await cmd.ExecuteScalarAsync(ct))?.ToString();
-            if (!string.Equals(result, "ok", StringComparison.OrdinalIgnoreCase)) logger.LogError("SQLite quick_check reported: {Result}", result);
-        }
-    }
-
-    var settings = app.Services.GetRequiredService<SettingsService>();
-    await settings.InitializeAsync(snm, ct);
-    await app.Services.GetRequiredService<AdminUserService>().SeedAsync(ct);
-    await app.Services.GetRequiredService<NodeRegistry>().LoadAsync(ct);
-    await app.Services.GetRequiredService<GeoIpService>().TryLoadFromDiskAsync(ct);
-
-    var s = settings.Snapshot;
-    logger.LogInformation("Server Node Monitor master {Version} starting: listen={Listen} dataDir={DataDir} db={DbSize:N0} bytes nodes={Nodes} timeZone={Tz} publicBaseUrl={PublicBaseUrl}",
-        AppInfo.Version, snm.Listen, paths.DataDir, paths.DbSizeBytes(), app.Services.GetRequiredService<NodeRegistry>().Count, s.TimeZoneId,
-        s.PublicBaseUrl.Length > 0 ? s.PublicBaseUrl : "(未配置 - 安装脚本需要 site.publicBaseUrl)");
-}
 
 /// <summary>Exposed for WebApplicationFactory-based integration tests.</summary>
 public partial class Program;
