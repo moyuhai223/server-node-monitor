@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <meta name="color-scheme" content="light dark">
+  <title>节点状态</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div id="banner" class="banner" hidden></div>
+  <header class="header">
+    <div class="header-main">
+      <h1 id="site-title">节点状态</h1>
+      <p id="site-subtitle" class="subtitle" hidden></p>
+    </div>
+    <div class="header-side">
+      <span id="summary" class="summary">在线 – / –</span>
+      <span id="clock" class="clock">--:--:--</span>
+      <button id="theme-toggle" class="theme-toggle" type="button" title="切换主题" aria-label="切换主题">◐</button>
+    </div>
+  </header>
+  <main id="grid" class="grid" aria-live="polite">
+    <div class="empty" id="empty">正在连接…</div>
+  </main>
+  <footer class="footer">
+    <span id="conn-status">连接中…</span>
+    <span class="dot">·</span>
+    <span>Powered by Server Node Monitor</span>
+  </footer>
+  <script src="vendor/signalr.min.js"></script>
+  <script src="vendor/signalr-protocol-msgpack.min.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

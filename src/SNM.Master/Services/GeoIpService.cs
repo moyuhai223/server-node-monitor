@@ -27,6 +27,7 @@ public sealed class GeoIpService(IOptions<SnmOptions> options, IHttpClientFactor
     private volatile Table<UInt128>? _v6;
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
 
+    public bool Enabled => options.Value.GeoIp.Enabled;
     public bool Ready => _v4 is not null;
     public int Ipv4Rows => _v4?.Count ?? 0;
     public int Ipv6Rows => _v6?.Count ?? 0;

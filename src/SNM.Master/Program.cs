@@ -21,6 +21,8 @@ using SNM.Master.Options;
 using SNM.Master.Runtime;
 using SNM.Master.Services;
 
+try { Console.OutputEncoding = System.Text.Encoding.UTF8; } catch (Exception ex) when (ex is IOException or System.Security.SecurityException) { }
+
 var builder = WebApplication.CreateBuilder(args);
 
 // ---- 1. configuration: appsettings -> appsettings.{Env} -> env (Snm__*) -> SNM_* aliases -> command line (docs/DESIGN.md 5-6)

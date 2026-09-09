@@ -21,8 +21,9 @@ web/**/dist/
 .vite/
 
 # Built web assets are produced by scripts/build-web.sh, not committed
-src/SNM.Master/wwwroot/admin/
-src/SNM.Master/wwwroot/assets/
+src/SNM.Master/wwwroot/*
+!src/SNM.Master/wwwroot/.gitkeep
+web/public/vendor/
 
 # OS / editor
 .DS_Store

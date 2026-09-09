@@ -161,7 +161,7 @@ public sealed class GeoIpRefreshService(GeoIpService geoIp, SettingsService sett
 
     protected override async Task TickAsync(DateTime now, CancellationToken ct)
     {
-        if (!settings.Snapshot.GeoIpEnabled) return;
+        if (!settings.Snapshot.GeoIpEnabled || !geoIp.Enabled) return;
         if (geoIp.NeedsRefresh())
         {
             try { await geoIp.RefreshAsync(ct); }

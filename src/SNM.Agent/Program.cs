@@ -18,6 +18,7 @@ internal static class Program
 
     private static async Task<int> Main(string[] args)
     {
+        try { Console.OutputEncoding = System.Text.Encoding.UTF8; } catch (Exception ex) when (ex is IOException or System.Security.SecurityException) { }
         if (!CliOptions.TryParse(args, Environment.GetEnvironmentVariable, out var opts, out var error))
         {
             Console.Error.WriteLine($"snm-agent: {error}");

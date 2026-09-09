@@ -102,6 +102,19 @@ public class NodesApiTests(MasterFactory factory) : IClassFixture<MasterFactory>
     }
 
     [Fact]
+    public async Task UnicodeNamesRoundTrip()
+    {
+        var auth = await factory.LoginAsync();
+        var created = await MasterFactory.DataAsync(await auth.PostAsJsonAsync("/api/nodes", new { publicName = "香港节点-01", adminRemark = "核心 DB-勿动" }));
+        var id = created.GetProperty("id").GetInt32();
+        var detail = await MasterFactory.DataAsync(await auth.GetAsync($"/api/nodes/{id}"));
+        Assert.Equal("香港节点-01", detail.GetProperty("publicName").GetString());
+        Assert.Equal("核心 DB-勿动", detail.GetProperty("adminRemark").GetString());
+        var found = await MasterFactory.DataAsync(await auth.GetAsync("/api/nodes?keyword=" + Uri.EscapeDataString("勿动")));
+        Assert.Equal(1, found.GetProperty("total").GetInt32());
+    }
+
+    [Fact]
     public async Task ListSupportsKeywordAndPaging()
     {
         var auth = await factory.LoginAsync();
