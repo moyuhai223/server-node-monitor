@@ -13,6 +13,8 @@ while [ $# -gt 0 ]; do
   shift
 done
 OUT_ABS="$(mkdir -p "$OUT" && cd "$OUT" && pwd)"
+# Node on Windows does not understand MSYS paths (/c/...): hand Vite a native path
+if command -v cygpath >/dev/null 2>&1; then OUT_NODE="$(cygpath -w "$OUT_ABS")"; else OUT_NODE="$OUT_ABS"; fi
 
 install_deps() {
   local dir="$1"
@@ -22,7 +24,7 @@ if [ "$SKIP" = 0 ]; then install_deps web/admin; install_deps web/public; fi
 
 # admin SPA -> $OUT/admin (vite.config.js reads VITE_OUT_DIR)
 rm -rf "$OUT_ABS/admin"
-(cd web/admin && VITE_OUT_DIR="$OUT_ABS/admin" npm run build)
+(cd web/admin && MSYS_NO_PATHCONV=1 VITE_OUT_DIR="$OUT_NODE/admin" npm run build)
 
 # public dashboard -> $OUT root
 mkdir -p "$OUT_ABS/vendor" "$OUT_ABS/css" "$OUT_ABS/js"

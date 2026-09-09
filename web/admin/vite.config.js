@@ -16,7 +16,7 @@ import Components from 'unplugin-vue-components/vite'
 import { defineConfig, loadEnv } from 'vite'
 import removeNoMatch from 'vite-plugin-router-warn'
 import VueDevTools from 'vite-plugin-vue-devtools'
-import { pluginIcons, pluginPagePathes } from './build/plugin-isme'
+import { pluginIcons, pluginPagePathes } from './build/plugin-isme/index.js'
 
 export default defineConfig(({ mode }) => {
   const viteEnv = loadEnv(mode, process.cwd())
@@ -55,31 +55,15 @@ export default defineConfig(({ mode }) => {
       port: 3200,
       open: false,
       proxy: {
-        '/api': {
-          target: VITE_PROXY_TARGET,
-          changeOrigin: true,
-          rewrite: path => path.replace(/^\/api/, ''),
-          secure: false,
-          configure: (proxy, options) => {
-            // 配置此项可在响应头中看到请求的真实地址
-            proxy.on('proxyRes', (proxyRes, req) => {
-              proxyRes.headers['x-real-url'] = new URL(req.url || '', options.target)?.href || ''
-            })
-          },
-        },
-        '/runapi': {
-          target: 'https://runapi.co',
-          changeOrigin: true,
-          rewrite: path => path.replace(/^\/runapi/, '/v1'),
-          secure: false,
-        },
+        '/api': { target: VITE_PROXY_TARGET, changeOrigin: true },
+        '/hubs': { target: VITE_PROXY_TARGET, changeOrigin: true, ws: true },
+        '/install': { target: VITE_PROXY_TARGET, changeOrigin: true },
       },
     },
-    optimizeDeps: {
-      include: ['vue3-intro-step'],
-    },
     build: {
-      chunkSizeWarningLimit: 1024, // chunk 大小警告的限制（单位kb）
+      outDir: process.env.VITE_OUT_DIR || path.resolve(process.cwd(), '../../src/SNM.Master/wwwroot/admin'),
+      emptyOutDir: true,
+      chunkSizeWarningLimit: 1024,
     },
   }
 })

@@ -6,5 +6,5 @@
  * Copyright © 2023 Ronnie Zhang(大脸怪) | https://isme.top
  **********************************/
 
-export { pluginIcons } from './icons'
-export { pluginPagePathes } from './page-pathes'
+export { pluginIcons } from './icons.js'
+export { pluginPagePathes } from './page-pathes.js'

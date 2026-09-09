@@ -6,7 +6,7 @@
  * Copyright © 2023 Ronnie Zhang(大脸怪) | https://isme.top
  **********************************/
 
-import { getIcons } from '..'
+import { getIcons } from '../index.js'
 
 const PLUGIN_ICONS_ID = 'isme:icons'
 export function pluginIcons() {

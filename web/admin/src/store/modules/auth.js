@@ -1,59 +1,51 @@
-/**********************************
- * @Author: Ronnie Zhang
- * @LastEditor: Ronnie Zhang
- * @LastEditTime: 2023/12/05 21:25:39
- * @Email: zclzone@outlook.com
- * Copyright © 2023 Ronnie Zhang(大脸怪) | https://isme.top
- **********************************/
-
 import { defineStore } from 'pinia'
-import { usePermissionStore, useRouterStore, useTabStore, useUserStore } from '@/store'
+import api from '@/api'
+import { useLiveStore, usePermissionStore, useRouterStore, useTabStore, useUserStore } from '@/store'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     accessToken: undefined,
+    refreshToken: undefined,
   }),
   actions: {
-    setToken({ accessToken }) {
+    setToken({ accessToken, refreshToken }) {
       this.accessToken = accessToken
+      if (refreshToken)
+        this.refreshToken = refreshToken
     },
     resetToken() {
       this.$reset()
     },
     toLogin() {
       const { router, route } = useRouterStore()
-      router.replace({
-        path: '/login',
-        query: route.query,
-      })
-    },
-    async switchCurrentRole(data) {
-      this.resetLoginState()
-      await nextTick()
-      this.setToken(data)
+      router.replace({ path: '/login', query: route.query })
     },
     resetLoginState() {
       const { resetUser } = useUserStore()
       const { resetRouter } = useRouterStore()
       const { resetPermission, accessRoutes } = usePermissionStore()
       const { resetTabs } = useTabStore()
-      // 重置路由
+      useLiveStore().disconnect()
       resetRouter(accessRoutes)
-      // 重置用户
       resetUser()
-      // 重置权限
       resetPermission()
-      // 重置Tabs
       resetTabs()
-      // 重置token
       this.resetToken()
     },
     async logout() {
+      const refreshToken = this.refreshToken
+      try {
+        if (this.accessToken)
+          await api.logout({ refreshToken })
+      }
+      catch {
+        // best effort
+      }
       this.resetLoginState()
       this.toLogin()
     },
   },
   persist: {
-    key: 'vue-naivue-admin_auth',
+    key: 'snm_auth',
   },
 })

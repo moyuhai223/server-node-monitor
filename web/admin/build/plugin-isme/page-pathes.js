@@ -6,7 +6,7 @@
  * Copyright © 2023 Ronnie Zhang(大脸怪) | https://isme.top
  **********************************/
 
-import { getPagePathes } from '..'
+import { getPagePathes } from '../index.js'
 
 const PLUGIN_PAGE_PATHES_ID = 'isme:page-pathes'
 export function pluginPagePathes() {

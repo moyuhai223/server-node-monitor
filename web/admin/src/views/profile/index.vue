@@ -24,9 +24,7 @@
             <n-button type="primary" ghost @click="avatarModalRef.open()">
               更改头像
             </n-button>
-            <span class="ml-12 opacity-60">
-              修改头像只支持在线链接，不提供上传图片功能，如有需要可自行对接！
-            </span>
+            <span class="ml-12 opacity-60">头像为在线图片链接</span>
           </div>
         </div>
       </n-space>

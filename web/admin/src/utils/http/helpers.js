@@ -1,12 +1,3 @@
-/**********************************
- * @FilePath: helpers.js
- * @Author: Ronnie Zhang
- * @LastEditor: Ronnie Zhang
- * @LastEditTime: 2023/12/04 22:46:22
- * @Email: zclzone@outlook.com
- * Copyright © 2023 Ronnie Zhang(大脸怪) | https://isme.top
- **********************************/
-
 import { useAuthStore } from '@/store'
 
 let isConfirming = false
@@ -34,18 +25,26 @@ function handleAuthExpired(content, needTip) {
 export function resolveResError(code, message, needTip = true) {
   switch (code) {
     case 401:
+    case 10011:
       return handleAuthExpired('登录已过期，是否重新登录？', needTip)
     case 11007:
     case 11008:
       return handleAuthExpired(`${message}，是否重新登录？`, needTip)
     case 403:
-      message = '请求被拒绝'
+      message = message ?? '请求被拒绝'
       break
     case 404:
-      message = '请求资源或接口不存在'
+      message = message ?? '请求资源或接口不存在'
+      break
+    case 429:
+      message = message ?? '请求过于频繁，请稍后再试'
       break
     case 500:
-      message = '服务器发生异常'
+      message = message ?? '服务器发生异常'
+      break
+    case 'ECONNABORTED':
+    case 'ERR_NETWORK':
+      message = '网络异常，请检查连接'
       break
     default:
       message = message ?? `【${code}】: 未知异常!`

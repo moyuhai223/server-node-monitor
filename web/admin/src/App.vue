@@ -31,7 +31,7 @@
 <script setup>
 import { darkTheme, dateZhCN, zhCN } from 'naive-ui'
 import { LayoutSetting } from '@/components'
-import { useAppStore, useTabStore } from '@/store'
+import { useAppStore, useAuthStore, useLiveStore, useTabStore } from '@/store'
 import { layoutSettingVisible } from './settings'
 
 const layouts = new Map()
@@ -62,4 +62,8 @@ const keepAliveNames = computed(() => {
 watchEffect(() => {
   appStore.setThemeColor(appStore.primaryColor, appStore.isDark)
 })
+
+const authStore = useAuthStore()
+const liveStore = useLiveStore()
+watch(() => authStore.accessToken, token => (token ? liveStore.connect() : liveStore.disconnect()), { immediate: true })
 </script>

@@ -14,7 +14,8 @@ export const basicRoutes = [
     path: '/',
     component: () => import('@/views/home/index.vue'),
     meta: {
-      title: '首页',
+      title: '总览大盘',
+      keepAlive: true,
     },
   },
 
