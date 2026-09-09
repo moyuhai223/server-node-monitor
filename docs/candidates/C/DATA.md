@@ -24,7 +24,7 @@
 | 建库时一次性 | `PRAGMA auto_vacuum=INCREMENTAL;`(在首个迁移的 `migrationBuilder.Sql` 中,且必须在任何表创建之前执行) |
 | 写入纪律 | 后台服务的批量写共享一个 `SqliteWriteGate`(`SemaphoreSlim(1,1)`),每批一个显式事务;REST 写直接走 `DbContext`,依赖 `busy_timeout` |
 | 维护 | 每日 UTC 04:00:`PRAGMA wal_checkpoint(TRUNCATE); PRAGMA incremental_vacuum(2000); PRAGMA optimize;` |
-| 迁移 | EF Core Migrations 代码提交在 `src/SNM.Master/Data/Migrations/`;启动时 `await db.Database.MigrateAsync()`(在任何 BackgroundService 之前,见 DESIGN §6);**禁止** `EnsureCreated`。开发期生成:`dotnet ef migrations add <Name> -p src/SNM.Master -o Data/Migrations`(需 `Microsoft.EntityFrameworkCore.Design` 10.0.11 作 PrivateAssets)。测试用临时文件 + `MigrateAsync`。 |
+| 迁移 | EF Core Migrations 代码提交在 `src/SNM.Master/Data/Migrations/`;启动时 `await db.Database.MigrateAsync()`(在任何 BackgroundService 之前,见 DESIGN §5);**禁止** `EnsureCreated`。开发期生成:`dotnet ef migrations add <Name> -p src/SNM.Master -o Data/Migrations`(需 `Microsoft.EntityFrameworkCore.Design` 10.0.11 作 PrivateAssets)。测试用临时文件 + `MigrateAsync`。 |
 | 模型约定 | 表名 = 实体复数名(`Nodes`、`AlertEvents`…);`string` 列默认 `TEXT` 无长度限制,业务层截断;所有 `bool` 存 INTEGER 0/1 |
 
 ---
@@ -358,7 +358,7 @@ for hourTs in [from .. target] step 1h:                 # 补跑
 | `GeoIpRefresher` | 启动后 5 s;成功后每 `refreshDays`;失败后 1 h | 原子替换文件 |
 | `DbMaintenance` | 每日 04:00 UTC | checkpoint/incremental_vacuum/optimize |
 
-启动顺序与依赖见 DESIGN.md §6。所有服务用 `PeriodicTimer`,对齐算法:`await Task.Delay(nextAligned - now)` 后进入 `while (await timer.WaitForNextTickAsync(ct))`;每次 tick 内部 try/catch 全部异常并记日志,**绝不让 BackgroundService 因异常退出**。
+启动顺序与依赖见 DESIGN.md §5。所有服务用 `PeriodicTimer`,对齐算法:`await Task.Delay(nextAligned - now)` 后进入 `while (await timer.WaitForNextTickAsync(ct))`;每次 tick 内部 try/catch 全部异常并记日志,**绝不让 BackgroundService 因异常退出**。
 
 ### 5.7 查询(供 API `GET /api/nodes/{id}/metrics`)
 

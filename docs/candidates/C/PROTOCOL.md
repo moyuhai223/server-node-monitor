@@ -1280,6 +1280,8 @@ internal sealed class StaticMessagePackHubProtocolWorker : MessagePackHubProtoco
 
 不 vendoring `MessagePackHubProtocol.cs`/`DefaultMessagePackHubProtocolWorker.cs`(它们依赖 `MessagePackSerializer` 非泛型路径与 `ContractlessStandardResolver`,正是要避开的动态代码)。
 
+> 参考实现:`spikes/aot-messagepack/Spike.Contracts/`(`SnmMessagePackHubProtocol` + `SnmArgumentSerializer` + Vendored/)已在本机验证过分析器 0 警告与 JIT 互通;M1 以其为起点重命名为本节的类型名并补齐全部 DTO。该 spike 额外 vendoring 了 `ProtocolHelper.cs`,与本节"内联 `TryGetReturnType`"二者选一即可,推荐内联以减少文件。
+
 ### 9.8 Master 侧 Hub 签名(`src/SNM.Master/Hubs`,供实现者对照)
 
 ```csharp

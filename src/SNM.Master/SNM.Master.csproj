@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <RootNamespace>SNM.Master</RootNamespace>
+    <AssemblyName>snm-master</AssemblyName>
+    <Description>Server Node Monitor master: SignalR/MessagePack ingestion, SQLite time-series, alerting, admin API and static UI hosting.</Description>
+    <UserSecretsId>snm-master</UserSecretsId>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <EnableRequestDelegateGenerator>false</EnableRequestDelegateGenerator>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Systemd" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SNM.Contracts\SNM.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="SNM.Master.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Agent install script templates are embedded so the binary is self-contained. -->
+    <EmbeddedResource Include="Resources\install-agent.sh" LogicalName="install-agent.sh" />
+    <EmbeddedResource Include="Resources\install-agent.ps1" LogicalName="install-agent.ps1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- wwwroot is produced by scripts/build-web.sh; keep the folder even when empty. -->
+    <Content Update="wwwroot\**" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

@@ -4,7 +4,7 @@
 using System;
 using System.Buffers;
 
-namespace Microsoft.AspNetCore.Internal;
+namespace SNM.Contracts.Protocol.Vendored;
 
 internal static class BinaryMessageFormatter
 {

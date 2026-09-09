@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>SNM.Contracts</RootNamespace>
+    <Description>Wire contracts shared by the SNM agent and master: MessagePack DTOs, hub constants and the reflection-free MessagePack hub protocol used by the Native AOT agent.</Description>
+    <!-- AOT contract: this library must produce zero IL2xxx/IL3xxx warnings. -->
+    <IsAotCompatible>true</IsAotCompatible>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+    <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- IDE0005 is disabled upstream for the shared vendored files. -->
+    <NoWarn>$(NoWarn);IDE0005</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Only MessagePackWriter/MessagePackReader/attributes are used from the agent path; never MessagePackSerializer or resolvers. -->
+    <PackageReference Include="MessagePack" />
+    <!-- IHubProtocol, HubMessage family, IInvocationBinder, HubProtocolConstants. Transitive dependency of SignalR.Client. -->
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Common" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="SNM.Contracts.Tests" />
+    <None Include="THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+</Project>

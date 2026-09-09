@@ -12,7 +12,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Microsoft.AspNetCore.Internal;
+namespace SNM.Contracts.Protocol.Vendored;
 
 internal sealed class MemoryBufferWriter : Stream, IBufferWriter<byte>
 {

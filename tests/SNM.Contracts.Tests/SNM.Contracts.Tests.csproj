@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <RootNamespace>SNM.Contracts.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <!-- The official protocol is the oracle for framing; MessagePackSerializer (reflection resolvers) is the oracle for DTO bytes. -->
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\SNM.Contracts\SNM.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="System.Buffers" />
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

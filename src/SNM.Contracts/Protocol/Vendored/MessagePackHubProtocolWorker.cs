@@ -12,9 +12,10 @@ using System.IO;
 using System.Runtime.ExceptionServices;
 using System.Text;
 using MessagePack;
-using Microsoft.AspNetCore.Internal;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.AspNetCore.SignalR.Protocol;
 
-namespace Microsoft.AspNetCore.SignalR.Protocol;
+namespace SNM.Contracts.Protocol.Vendored;
 
 /// <summary>
 /// Implements support for MessagePackHubProtocol. This code is shared between SignalR and Blazor.
