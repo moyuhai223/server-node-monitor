@@ -33,7 +33,12 @@ SNM_DATA_DIR="$DATA" SNM_LISTEN="$BASE" ASPNETCORE_ENVIRONMENT=Development SNM_G
   dotnet run --project src/SNM.Master --no-build > "$DATA/master.log" 2>&1 &
 MASTER_PID=$!
 AGENT_PID=""
-cleanup() { kill "$AGENT_PID" "$MASTER_PID" "$SINK_PID" 2>/dev/null || true; wait 2>/dev/null || true; }
+cleanup() {
+  # SIGKILL: on Windows (Git Bash) a plain TERM does not stop native dotnet/python children, and `wait` would hang.
+  for p in "$AGENT_PID" "$MASTER_PID" "$SINK_PID"; do [ -n "$p" ] && kill -9 "$p" 2>/dev/null; done
+  case "$(uname -s)" in MINGW*|MSYS*) taskkill //F //IM snm-agent.exe >/dev/null 2>&1; taskkill //F //IM snm-master.exe >/dev/null 2>&1 ;; esac
+  sleep 1
+}
 trap cleanup EXIT
 
 for i in $(seq 1 60); do sleep 1; curl -fsS -o /dev/null "$BASE/healthz" 2>/dev/null && break; done
@@ -55,7 +60,7 @@ echo "$NODE" | json 'd["data"]["live"]["ts"] is not None' | grep -q True && ok "
 echo "$NODE" | json 'len(d["data"]["ips"]) > 0' | grep -q True && ok "ips merged" || fail "no ips"
 echo "$NODE" | json 'd["data"]["hardware"]["cpuCores"] > 0' | grep -q True && ok "hardware registered" || fail "hardware missing"
 
-kill "$AGENT_PID" 2>/dev/null; wait "$AGENT_PID" 2>/dev/null; AGENT_PID=""
+kill -9 "$AGENT_PID" 2>/dev/null; case "$(uname -s)" in MINGW*|MSYS*) taskkill //F //IM snm-agent.exe >/dev/null 2>&1 ;; esac; AGENT_PID=""
 sleep 26
 curl -fsS -H "$H" "$BASE/api/alerts/active" | json 'any(a["rule"]==1 for a in d["data"])' | grep -q True && ok "offline alert fired" || fail "offline alert missing"
 
