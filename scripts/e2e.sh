@@ -16,9 +16,10 @@ json() { PY=$(command -v python3 || command -v python); $PY -c "import sys,json;
 dotnet build ServerNodeMonitor.slnx -c Debug -nologo -v q || { echo "[e2e] build failed"; exit 1; }
 
 cat > "$DATA/sink.py" <<'EOF'
-import sys
+import os, sys, threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 out, port = sys.argv[1], int(sys.argv[2])
+threading.Timer(300, lambda: os._exit(0)).start()   # never outlive the test run
 class H(BaseHTTPRequestHandler):
     def do_POST(self):
         n = int(self.headers.get('Content-Length', 0)); body = self.rfile.read(n)
@@ -27,16 +28,17 @@ class H(BaseHTTPRequestHandler):
     def log_message(self, *a): pass
 HTTPServer(('127.0.0.1', port), H).serve_forever()
 EOF
-$(command -v python3 || command -v python) "$DATA/sink.py" "$DATA/hooks.jsonl" "$SINK_PORT" &
+$(command -v python3 || command -v python) "$DATA/sink.py" "$DATA/hooks.jsonl" "$SINK_PORT" > "$DATA/sink.log" 2>&1 < /dev/null &
 SINK_PID=$!
 SNM_DATA_DIR="$DATA" SNM_LISTEN="$BASE" ASPNETCORE_ENVIRONMENT=Development SNM_GEOIP_ENABLED=false SNM_PUBLIC_BASE_URL="$BASE" SNM_ADMIN_PASSWORD=e2e-password-123 \
-  dotnet run --project src/SNM.Master --no-build > "$DATA/master.log" 2>&1 &
+  dotnet run --project src/SNM.Master --no-build > "$DATA/master.log" 2>&1 < /dev/null &
 MASTER_PID=$!
 AGENT_PID=""
 cleanup() {
   # SIGKILL: on Windows (Git Bash) a plain TERM does not stop native dotnet/python children, and `wait` would hang.
   for p in "$AGENT_PID" "$MASTER_PID" "$SINK_PID"; do [ -n "$p" ] && kill -9 "$p" 2>/dev/null; done
   case "$(uname -s)" in MINGW*|MSYS*) taskkill //F //IM snm-agent.exe >/dev/null 2>&1; taskkill //F //IM snm-master.exe >/dev/null 2>&1 ;; esac
+  case "$(uname -s)" in MINGW*|MSYS*) taskkill //F //IM python.exe >/dev/null 2>&1 ;; esac
   sleep 1
 }
 trap cleanup EXIT
@@ -51,7 +53,7 @@ CH=$(curl -fsS -X POST "$BASE/api/settings/channels" -H "$H" -H 'Content-Type: a
 curl -fsS -X POST "$BASE/api/settings/channels/$CH/test" -H "$H" | json 'd["data"]["ok"]' | grep -q True && ok "webhook test delivered" || fail "webhook test"
 KEY=$(curl -fsS -X POST "$BASE/api/nodes" -H "$H" -H 'Content-Type: application/json' -d '{"publicName":"e2e-node","adminRemark":"E2E-SECRET-REMARK","traffic":{"limitBytes":1000000000000}}' | json 'd["data"]["agentKey"]')
 
-dotnet run --project src/SNM.Agent --no-build -- run --server "$BASE" --key "$KEY" --interval 1000 > "$DATA/agent.log" 2>&1 &
+dotnet run --project src/SNM.Agent --no-build -- run --server "$BASE" --key "$KEY" --interval 1000 > "$DATA/agent.log" 2>&1 < /dev/null &
 AGENT_PID=$!
 sleep 14
 NODE=$(curl -fsS -H "$H" "$BASE/api/nodes/1")
@@ -64,7 +66,7 @@ kill -9 "$AGENT_PID" 2>/dev/null; case "$(uname -s)" in MINGW*|MSYS*) taskkill /
 sleep 26
 curl -fsS -H "$H" "$BASE/api/alerts/active" | json 'any(a["rule"]==1 for a in d["data"])' | grep -q True && ok "offline alert fired" || fail "offline alert missing"
 
-dotnet run --project src/SNM.Agent --no-build -- run --server "$BASE" --key "$KEY" --interval 1000 > "$DATA/agent2.log" 2>&1 &
+dotnet run --project src/SNM.Agent --no-build -- run --server "$BASE" --key "$KEY" --interval 1000 > "$DATA/agent2.log" 2>&1 < /dev/null &
 AGENT_PID=$!
 sleep 16
 curl -fsS -H "$H" "$BASE/api/alerts/active" | json 'len(d["data"])' | grep -q '^0$' && ok "alert resolved" || fail "alert still active"
@@ -75,6 +77,12 @@ grep -q '"event":"alert.resolved"' "$DATA/hooks.jsonl" 2>/dev/null && ok "sink r
 
 # public snapshot must not leak anything (negotiate + raw bytes of the snapshot via the admin-free public hub is covered by tests; here check the REST surface is closed)
 curl -s -o /dev/null -w "%{http_code}" "$BASE/api/nodes" | grep -q 401 && ok "anonymous REST rejected" || fail "anonymous REST not rejected"
-curl -fsS -H "$H" "$BASE/api/nodes/1/metrics?range=24h" | json 'len(d["data"]["points"]) >= 1' | grep -q True && ok "1-minute metrics stored" || fail "no metrics rows"
+# the minute flush runs at :05 of every minute; wait for up to ~2 minutes for the first completed bucket
+METRICS_OK=0
+for i in $(seq 1 26); do
+  if curl -fsS -H "$H" "$BASE/api/nodes/1/metrics?range=24h" | json 'len(d["data"]["points"]) >= 1' | grep -q True; then METRICS_OK=1; break; fi
+  sleep 5
+done
+[ "$METRICS_OK" = 1 ] && ok "1-minute metrics stored" || fail "no metrics rows"
 
 if [ "$PASS" = 1 ]; then echo "[e2e] PASS"; else echo "[e2e] FAILED (logs in $DATA)"; trap - EXIT; cleanup; exit 1; fi
