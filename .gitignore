@@ -8,8 +8,12 @@ TestResults/
 artifacts/
 publish/
 
-# Data / runtime state
-data/
+# Runtime state (the source folder src/SNM.Master/Data must stay tracked; git on Windows ignores case)
+/data/
+src/SNM.Master/data/snm.db*
+src/SNM.Master/data/geoip/
+src/SNM.Master/data/backups/
+data/dev/
 *.db
 *.db-shm
 *.db-wal
