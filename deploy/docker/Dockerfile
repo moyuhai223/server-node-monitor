@@ -2,7 +2,8 @@
 # Build context = repository root:  docker build -f deploy/docker/Dockerfile -t snm-master .
 
 # ---- web assets ----
-FROM node:22-alpine AS web
+# web assets and framework-dependent IL are architecture neutral: build them natively on the build host (QEMU crashes node)
+FROM --platform=$BUILDPLATFORM node:22-alpine AS web
 RUN apk add --no-cache bash
 WORKDIR /src
 COPY web/admin/package.json web/admin/package-lock.json* web/admin/
@@ -14,7 +15,7 @@ COPY scripts/build-web.sh scripts/
 RUN bash scripts/build-web.sh --out /out/wwwroot --skip-install
 
 # ---- master build ----
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 COPY global.json Directory.Build.props Directory.Packages.props ./
 COPY src/SNM.Contracts/SNM.Contracts.csproj src/SNM.Contracts/
