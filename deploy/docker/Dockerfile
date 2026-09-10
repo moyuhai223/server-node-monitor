@@ -3,6 +3,7 @@
 
 # ---- web assets ----
 FROM node:22-alpine AS web
+RUN apk add --no-cache bash
 WORKDIR /src
 COPY web/admin/package.json web/admin/package-lock.json* web/admin/
 COPY web/public/package.json web/public/package-lock.json* web/public/
@@ -37,5 +38,4 @@ RUN mkdir -p /data && chown $APP_UID:$APP_UID /data
 VOLUME /data
 EXPOSE 5080
 USER $APP_UID
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s CMD ["dotnet", "-e", "0"] || exit 0
 ENTRYPOINT ["dotnet", "snm-master.dll"]
