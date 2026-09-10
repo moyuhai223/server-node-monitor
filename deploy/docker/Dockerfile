@@ -23,7 +23,7 @@ RUN dotnet restore src/SNM.Master/SNM.Master.csproj
 COPY src/ src/
 COPY --from=web /out/wwwroot src/SNM.Master/wwwroot
 ARG VERSION=1.0.0
-RUN dotnet publish src/SNM.Master/SNM.Master.csproj -c Release -o /app --no-restore -p:Version=$VERSION
+RUN dotnet publish src/SNM.Master/SNM.Master.csproj -c Release -o /app --no-restore -p:Version="${VERSION#v}"
 
 # ---- runtime ----
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
