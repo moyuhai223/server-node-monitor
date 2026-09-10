@@ -11,6 +11,8 @@
 | Agent ILC(`scripts/ilc-check.sh`,win-arm64) | ILC 完成、**0 条 IL 警告**;仅 link 步骤因无 MSVC 失败(预期) |
 | `scripts/e2e.sh` 等价流程 | 注册/心跳/IP 合并/1 分钟桶/离线告警/Webhook 投递/恢复 全部通过 |
 | 浏览器验证 | `/admin/` 登录、总览、节点管理、节点详情(图表/流量/告警)、`/` 大屏实时刷新且载荷不含 IP/主机名/备注 |
+| GitHub Actions(2026-09-10,`v1.0.0`) | `agent-aot`:linux-x64 / linux-arm64 / win-x64 三平台 Native AOT 发布成功,IL 警告门禁通过;`master-build`:Linux 上构建 + 166 测试 + ILC 门禁通过,发布 `snm-master-linux-{x64,arm64}.tar.gz`,推送多架构镜像 `ghcr.io/moyuhai223/snm-master:{v1.0.0,latest}` |
+| 发布产物实测 | 下载 Release 的 `snm-agent-win-x64.zip`(6.7 MB 单文件 AOT 二进制),sha256 校验一致,在本机以 x64 仿真运行 `--version` / `test` 正常采集 |
 
 ## 与设计文档的差异
 
@@ -32,8 +34,16 @@
 
 ## 尚未做 / 需要在真实环境补充验证
 
-- **Native AOT 二进制**只能由 GitHub Actions(`.github/workflows/agent-aot.yml`)产出;本机没有 MSVC 链接器,无法运行 AOT 产物做运行时验证(ILC 零警告是目前能达到的上限)。
+- Native AOT 二进制由 GitHub Actions 产出并已实测可运行(见上表);本机仍无法自行链接,`scripts/ilc-check.sh` 只到 ILC 阶段。
 - Linux 采集器(`/proc`、`/sys`)只经过解析器单元测试(固定文本样本)与 Windows 上的 JIT 运行验证;首次在 Linux 上部署时请先执行 `snm-agent test` 核对网卡/挂载点名单。
 - Telegram 渠道未做真实发送(需要 Bot Token);Webhook 已用本地接收器验证含 HMAC 签名头。
 - `web/admin` 未做移动端适配打磨;表格在窄窗口依赖横向滚动。
 - 反代(Nginx/1Panel)配置提供了模板但未在线验证 WebSocket 升级。
+
+## CI 踩坑记录(v1.0.0 发布过程)
+
+1. 根 `.gitignore` 的 `data/` 规则在 Windows(大小写不敏感)上把 `src/SNM.Master/Data/` 排除在仓库之外,Linux 上编译失败 → 改为具体路径规则。
+2. `node:22-alpine` 没有 `bash` → 构建阶段 `apk add bash`。
+3. Docker `VERSION` 构建参数来自 `github.ref_name`,带 `v` 前缀会触发 NETSDK1018 → Dockerfile 内 `${VERSION#v}`。
+4. arm64 镜像在 QEMU 下执行 `npm ci` 时 Node 报 Illegal instruction → 前端与 IL 构建阶段固定 `--platform=$BUILDPLATFORM`,仅运行时镜像多架构。
+5. 重打同名 tag 前需先删除已存在的 Release,否则旧 Release 会残留为无标签草稿。
