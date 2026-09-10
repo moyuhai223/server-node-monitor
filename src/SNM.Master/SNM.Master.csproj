@@ -30,9 +30,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Agent install script templates are embedded so the binary is self-contained. -->
-    <EmbeddedResource Include="Resources\install-agent.sh" LogicalName="install-agent.sh" />
-    <EmbeddedResource Include="Resources\install-agent.ps1" LogicalName="install-agent.ps1" />
+    <!-- The agent install scripts in deploy/ double as templates: {{SERVER_URL}} etc. are filled in by InstallScriptService. -->
+    <EmbeddedResource Include="..\..\deploy\install-agent.sh" LogicalName="install-agent.sh" Link="Resources\install-agent.sh" />
+    <EmbeddedResource Include="..\..\deploy\install-agent.ps1" LogicalName="install-agent.ps1" Link="Resources\install-agent.ps1" />
+    <!-- Never ship the development settings (dev admin password) in a publish output. -->
+    <Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
   </ItemGroup>
 
   <ItemGroup>

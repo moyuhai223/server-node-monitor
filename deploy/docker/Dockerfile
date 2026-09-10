@@ -22,6 +22,7 @@ COPY src/SNM.Contracts/SNM.Contracts.csproj src/SNM.Contracts/
 COPY src/SNM.Master/SNM.Master.csproj src/SNM.Master/
 RUN dotnet restore src/SNM.Master/SNM.Master.csproj
 COPY src/ src/
+COPY deploy/install-agent.sh deploy/install-agent.ps1 deploy/
 COPY --from=web /out/wwwroot src/SNM.Master/wwwroot
 ARG VERSION=1.0.0
 RUN dotnet publish src/SNM.Master/SNM.Master.csproj -c Release -o /app --no-restore -p:Version="${VERSION#v}"

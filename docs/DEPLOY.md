@@ -2,6 +2,16 @@
 
 # DEPLOY — 部署、安装脚本、CI、配置对照、升级与备份(候选方案 A)
 
+## 一键安装(已实现,以此为准)
+
+| 脚本 | 用途 | 命令 |
+|---|---|---|
+| `deploy/install-master.sh` | 服务端:下载 Release 包 → 校验 sha256 → 创建 `snm-master` 用户 → `/opt/snm-master` + `/var/lib/snm-master` + `/etc/snm-master/master.env` → systemd → 等待 `/healthz`;可选 `--nginx DOMAIN` 写反代站点;`upgrade` 自动备份数据库;`uninstall [--purge]`;`status` | `curl -fsSL https://raw.githubusercontent.com/moyuhai223/server-node-monitor/main/deploy/install-master.sh \| sudo bash -s -- --public-url https://m.example.com` |
+| `deploy/install-agent.sh` | 探针(Linux):既是 Master 在 `/install/<token>` 渲染的模板(`{{SERVER_URL}}` / `{{AGENT_KEY}}` / `{{RELEASE_BASE_URL}}` 被填入),也可独立运行,参数/环境变量优先级高于模板值 | `curl -fsSL .../deploy/install-agent.sh \| sudo bash -s -- --server https://m.example.com --key snmk_xxx [--proxy socks5://...]` |
+| `deploy/install-agent.ps1` | 探针(Windows x64):同上,值来自 `$env:SNM_SERVER` / `$env:SNM_KEY`(或 Master 渲染) | `$env:SNM_SERVER='https://m.example.com'; $env:SNM_KEY='snmk_xxx'; irm .../deploy/install-agent.ps1 \| iex` |
+
+单文件自包含的 Master 需要一个可写目录解压原生库,安装脚本在 unit 里设置 `DOTNET_BUNDLE_EXTRACT_BASE_DIR=/var/lib/snm-master/.net`(与 `ProtectSystem=strict` + `ReadWritePaths` 配合)。以下为设计文档原文。
+
 ---
 
 ## 0. 定案(BRIEF §3 Q9 与 CI 产物)

@@ -31,6 +31,8 @@
 | 时序表 `DiskUsedMb/DiskTotalMb` | — | 1 分钟桶存均值(汇总磁盘),用于 30 天磁盘曲线 |
 | 大屏字节单位 | — | 流量/网速十进制(1 TB = 1000 GB,与商家口径一致);内存/磁盘 1024 进制 |
 | Master 版本号 | `-p:Version` | `Directory.Build.props` 默认 `1.0.0-dev`,CI 用 tag 覆盖;`InformationalVersion` 含 commit sha |
+| 安装脚本 | `deploy/install-agent.sh.tmpl` 模板 + Master 内嵌副本 | 单一来源:`deploy/install-agent.sh` / `.ps1` 直接被 Master 嵌入(csproj 链接),模板占位符未渲染时脚本按参数/环境变量独立运行;新增 `deploy/install-master.sh` 服务端一键安装(见 README) |
+| 发行包内容 | — | `appsettings.Development.json` 不再进入 publish 输出(`CopyToPublishDirectory=Never`),安装脚本也会删除旧包里的该文件 |
 
 ## 尚未做 / 需要在真实环境补充验证
 
