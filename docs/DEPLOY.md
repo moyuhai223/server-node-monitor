@@ -8,8 +8,8 @@
 
 | 项 | 定案 |
 |---|---|
-| Agent 产物 | `snm-agent-linux-x64.tar.gz`、`snm-agent-linux-arm64.tar.gz`、`snm-agent-win-x64.zip`,各附 `.sha256`(`sha256sum` 格式一行);GitHub Release 资产;`latest` 可用 `https://github.com/OWNER/REPO/releases/latest/download/<asset>` |
-| Master 产物 | `snm-master-linux-x64.tar.gz`、`snm-master-linux-arm64.tar.gz`(自包含单文件 JIT,含 `wwwroot/`)+ 容器镜像 `ghcr.io/OWNER/snm-master:<version>` / `:latest`(linux/amd64 + arm64) |
+| Agent 产物 | `snm-agent-linux-x64.tar.gz`、`snm-agent-linux-arm64.tar.gz`、`snm-agent-win-x64.zip`,各附 `.sha256`(`sha256sum` 格式一行);GitHub Release 资产;`latest` 可用 `https://github.com/moyuhai223/server-node-monitor/releases/latest/download/<asset>` |
+| Master 产物 | `snm-master-linux-x64.tar.gz`、`snm-master-linux-arm64.tar.gz`(自包含单文件 JIT,含 `wwwroot/`)+ 容器镜像 `ghcr.io/moyuhai223/snm-master:<version>` / `:latest`(linux/amd64 + arm64) |
 | 安装脚本 | 后台按节点渲染 `deploy/install-agent.sh.tmpl`,通过 `GET /install/{token}` 分发;幂等(重复执行 = 升级/修复);`uninstall` 子命令;专用系统用户 `snm-agent`;`uname -m` 选择架构;sha256 校验;systemd `Restart=always` |
 | Windows Agent | `snm-agent.exe` + 计划任务(开机启动、SYSTEM 或专用账户),脚本 `install-agent.ps1.tmpl`(`irm … \| iex`);不做 Windows 服务宿主(避免 Hosting 依赖) |
 | 反代 | Nginx 或 1Panel(OpenResty)终止 TLS,转发到 `127.0.0.1:5080`,必须转发 WebSocket 升级头与 `X-Forwarded-*` |
@@ -23,7 +23,7 @@
 | `snm-agent-<rid>.tar.gz` | 单文件 `snm-agent`(可执行,`chmod 755`) | `/opt/snm-agent/snm-agent` |
 | `snm-agent-win-x64.zip` | `snm-agent.exe` | `C:\Program Files\snm-agent\snm-agent.exe` |
 | `snm-master-<rid>.tar.gz` | `SNM.Master`(自包含单文件)、`appsettings.json`、`wwwroot/`、`LICENSE`、`THIRD-PARTY-NOTICES.md` | `/opt/snm-master/` |
-| 镜像 `ghcr.io/OWNER/snm-master` | 同上,入口 `dotnet SNM.Master.dll`,`/data` 卷 | Docker |
+| 镜像 `ghcr.io/moyuhai223/snm-master` | 同上,入口 `dotnet SNM.Master.dll`,`/data` 卷 | Docker |
 
 版本号来源:Git tag `vX.Y.Z` → `-p:Version=X.Y.Z`;`InformationalVersion` 附加 commit sha(SourceLink);Agent `--version` 与 Master `/api/system/info.version` 输出一致。
 
@@ -208,7 +208,7 @@ ENTRYPOINT ["dotnet", "SNM.Master.dll"]
 ```yaml
 services:
   snm-master:
-    image: ghcr.io/OWNER/snm-master:1.0.0
+    image: ghcr.io/moyuhai223/snm-master:1.0.0
     container_name: snm-master
     restart: unless-stopped
     ports:
@@ -227,8 +227,8 @@ services:
 ## 3. Agent 手工安装(脚本之外的参考)
 
 ```bash
-curl -fsSLO https://github.com/OWNER/REPO/releases/latest/download/snm-agent-linux-x64.tar.gz
-curl -fsSLO https://github.com/OWNER/REPO/releases/latest/download/snm-agent-linux-x64.tar.gz.sha256
+curl -fsSLO https://github.com/moyuhai223/server-node-monitor/releases/latest/download/snm-agent-linux-x64.tar.gz
+curl -fsSLO https://github.com/moyuhai223/server-node-monitor/releases/latest/download/snm-agent-linux-x64.tar.gz.sha256
 sha256sum -c snm-agent-linux-x64.tar.gz.sha256
 sudo mkdir -p /opt/snm-agent && sudo tar xzf snm-agent-linux-x64.tar.gz -C /opt/snm-agent
 /opt/snm-agent/snm-agent --version

@@ -106,7 +106,7 @@ public sealed class SettingsService(IDbContextFactory<SnmDbContext> dbFactory, I
         ["site.timeZone"] = new("\"UTC\"", TimeZoneId),
         ["public.showSpecs"] = new("true", Bool),
         ["public.showTraffic"] = new("true", Bool),
-        ["agent.releaseBaseUrl"] = new("\"https://github.com/OWNER/server-node-monitor/releases/latest/download\"", HttpUrlOrEmpty),
+        ["agent.releaseBaseUrl"] = new("\"https://github.com/moyuhai223/server-node-monitor/releases/latest/download\"", HttpUrlOrEmpty),
         ["agent.defaultIntervalMs"] = new("2000", Int(1000, 60000)),
         ["agent.statusIntervalSec"] = new("300", Int(60, 3600)),
         ["agent.installTokenTtlHours"] = new("24", Int(1, 168)),

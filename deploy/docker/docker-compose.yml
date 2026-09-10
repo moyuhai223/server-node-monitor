@@ -1,6 +1,6 @@
 services:
   snm-master:
-    image: ghcr.io/OWNER/snm-master:latest
+    image: ghcr.io/moyuhai223/snm-master:latest
     # or build locally:  build: { context: ../.., dockerfile: deploy/docker/Dockerfile }
     container_name: snm-master
     restart: unless-stopped
