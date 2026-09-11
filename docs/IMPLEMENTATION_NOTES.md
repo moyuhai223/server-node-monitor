@@ -34,6 +34,14 @@
 | 安装脚本 | `deploy/install-agent.sh.tmpl` 模板 + Master 内嵌副本 | 单一来源:`deploy/install-agent.sh` / `.ps1` 直接被 Master 嵌入(csproj 链接),模板占位符未渲染时脚本按参数/环境变量独立运行;新增 `deploy/install-master.sh` 服务端一键安装(见 README) |
 | 发行包内容 | — | `appsettings.Development.json` 不再进入 publish 输出(`CopyToPublishDirectory=Never`),安装脚本也会删除旧包里的该文件 |
 
+## 主题系统(2026-09-11)
+
+- `web/public` 拆为 `web/sdk`(`snm-client.js` + SignalR 包 → `/vendor/`)与 `web/themes/<id>`(内置 `default`、`minimal`),每个主题一个 `theme.json`。
+- Master:`ThemeService`(扫描 `wwwroot/themes` 与 `<DataDir>/themes`,zip 安装校验:id 规则、路径穿越、扩展名白名单、解压上限、SDK 版本、内置 id 冲突)+ `ThemeMiddleware`(`/` = 启用主题,`/themes/<id>/` = 预览;保留前缀 `/api /hubs /admin /vendor /install /healthz`)+ `/api/settings/themes` 管理接口 + 设置键 `site.theme` / `site.themeOptions`。
+- `PublicSiteDto` 新增 `theme`、`opts` 字段;站点级设置变化通过 Public Hub 重发快照,SDK 检测主题变化自动 reload。
+- 旧的 `Snm:Dev:PublicSourceDir` 改为 `Snm:Dev:WebSourceDir`(开发时直接从 `web/` 提供 SDK 与主题)。
+- 测试:`ThemeTests`(安装/启用/预览/删除回退、恶意包拒绝、目录穿越、未知主题回退)。
+
 ## 尚未做 / 需要在真实环境补充验证
 
 - Native AOT 二进制由 GitHub Actions 产出并已实测可运行(见上表);本机仍无法自行链接,`scripts/ilc-check.sh` 只到 ILC 阶段。

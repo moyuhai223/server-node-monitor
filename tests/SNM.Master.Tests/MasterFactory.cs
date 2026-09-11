@@ -25,6 +25,20 @@ public sealed class MasterFactory : WebApplicationFactory<Program>, IAsyncLifeti
         builder.UseSetting("Snm:Admin:Password", AdminPassword);
         builder.UseSetting("Snm:PublicBaseUrl", "https://m.test");
         builder.UseSetting("Logging:LogLevel:Default", "Warning");
+        // built-in themes straight from the source tree so the tests do not need scripts/build-web.sh
+        builder.UseSetting("Snm:Themes:BuiltInDir", FindRepoDir("web", "themes"));
+    }
+
+    private static string FindRepoDir(params string[] parts)
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null)
+        {
+            var candidate = Path.Combine([dir.FullName, .. parts]);
+            if (Directory.Exists(candidate)) return candidate;
+            dir = dir.Parent;
+        }
+        throw new DirectoryNotFoundException(string.Join('/', parts));
     }
 
     public async Task InitializeAsync()

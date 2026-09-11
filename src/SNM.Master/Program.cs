@@ -104,6 +104,7 @@ builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddSingleton<AdminUserService>();
 builder.Services.AddSingleton<NodeService>();
 builder.Services.AddSingleton<InstallScriptService>();
+builder.Services.AddSingleton<ThemeService>();
 builder.Services.AddSingleton<DashboardService>();
 builder.Services.AddSingleton<AlertQueryService>();
 builder.Services.AddSingleton<HubStats>();
@@ -204,15 +205,20 @@ app.UseStatusCodePages(async ctx =>
 });
 app.UseRateLimiter();
 
-var devPublic = snm.Dev.PublicSourceDir.Length > 0 ? Path.GetFullPath(Path.Combine(app.Environment.ContentRootPath, snm.Dev.PublicSourceDir)) : null;
-if (devPublic is not null && Directory.Exists(devPublic) && File.Exists(Path.Combine(devPublic, "index.html")))
+// Public dashboard themes: the active theme at "/", every installed theme at "/themes/{id}/" (docs/THEMES.md).
+app.UseMiddleware<ThemeMiddleware>();
+// Development: serve the SDK bundles from web/sdk/dist so themes can be edited without rebuilding wwwroot.
+var devWeb = snm.Dev.WebSourceDir.Length > 0 ? Path.GetFullPath(Path.Combine(app.Environment.ContentRootPath, snm.Dev.WebSourceDir)) : null;
+if (devWeb is not null && Directory.Exists(Path.Combine(devWeb, "sdk", "dist")))
 {
-    var provider = new PhysicalFileProvider(devPublic);
-    app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = provider });
-    app.UseStaticFiles(new StaticFileOptions { FileProvider = provider, OnPrepareResponse = c => c.Context.Response.Headers.CacheControl = "no-cache" });
-    app.Logger.LogInformation("Serving the public dashboard from {Dir} (development)", devPublic);
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new PhysicalFileProvider(Path.Combine(devWeb, "sdk", "dist")),
+        RequestPath = "/vendor",
+        OnPrepareResponse = c => c.Context.Response.Headers.CacheControl = "no-cache",
+    });
+    app.Logger.LogInformation("Serving /vendor and themes from {Dir} (development)", devWeb);
 }
-app.UseDefaultFiles();
 app.UseStaticFiles(new StaticFileOptions
 {
     OnPrepareResponse = ctx =>
@@ -235,6 +241,7 @@ AuthEndpoints.Map(app);
 NodesEndpoints.Map(app);
 AlertsEndpoints.Map(app);
 SettingsEndpoints.Map(app);
+ThemesEndpoints.Map(app);
 SystemEndpoints.Map(app);
 
 var webRoot = app.Environment.WebRootPath ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot");
@@ -243,10 +250,8 @@ if (File.Exists(Path.Combine(webRoot, "admin", "index.html")))
 else
     app.MapFallback("/admin/{*path}", () => Results.Text("管理后台尚未构建:请运行 scripts/build-web.sh 后重启 Master。", "text/plain; charset=utf-8", statusCode: 404));
 app.MapFallback("/api/{**path}", () => Results.Json(ApiResponse.Fail(404, "接口不存在"), ApiJson.Options, statusCode: 404));
-// Only register a "/" endpoint when no dashboard exists: a matched endpoint makes the static-file middleware skip the request.
-var hasPublicIndex = File.Exists(Path.Combine(webRoot, "index.html")) || (devPublic is not null && File.Exists(Path.Combine(devPublic, "index.html")));
-if (!hasPublicIndex)
-    app.MapGet("/", () => Results.Text("Server Node Monitor: public dashboard not built yet (run scripts/build-web.sh).", "text/plain; charset=utf-8", statusCode: 404));
+if (app.Services.GetRequiredService<ThemeService>().Active is null)
+    app.MapGet("/", () => Results.Text("Server Node Monitor: no public theme installed (run scripts/build-web.sh or upload a theme in 系统设置 → 大屏主题).", "text/plain; charset=utf-8", statusCode: 404));
 
 // ---- 6. blocking initialisation: migrate, seed, load memory state (idempotent; also a hosted service for test hosts)
 await app.Services.GetRequiredService<StartupInitializer>().EnsureInitializedAsync(app.Lifetime.ApplicationStopping);

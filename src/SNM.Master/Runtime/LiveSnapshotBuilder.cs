@@ -21,6 +21,7 @@ public sealed class LiveSnapshotBuilder(NodeRegistry registry, SettingsService s
         return new PublicSiteDto
         {
             Title = s.PublicTitle, Subtitle = s.PublicSubtitle, ShowSpecs = s.ShowSpecs, ShowTraffic = s.ShowTraffic, OfflineTimeoutSec = s.OfflineTimeoutSec,
+            Theme = s.Theme, ThemeOptions = s.ThemeOptions,
         };
     }
 

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>节点状态</title>
+  <!-- theme files: relative paths (work both at / and at /themes/minimal/) -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div>
+      <h1 id="title">节点状态</h1>
+      <p id="subtitle" hidden></p>
+    </div>
+    <div class="meta"><span id="summary">–</span><span id="conn" class="conn">连接中…</span></div>
+  </header>
+  <table>
+    <thead>
+      <tr><th>节点</th><th>状态</th><th>CPU</th><th>内存</th><th>磁盘</th><th>下行</th><th>上行</th><th>本月流量</th><th>运行</th><th>最后上报</th></tr>
+    </thead>
+    <tbody id="rows"><tr><td colspan="10" class="empty">正在连接…</td></tr></tbody>
+  </table>
+  <footer>Powered by Server Node Monitor · minimal theme</footer>
+  <!-- shared SDK bundles: always absolute /vendor/ -->
+  <script src="/vendor/signalr.min.js"></script>
+  <script src="/vendor/signalr-protocol-msgpack.min.js"></script>
+  <script type="module" src="theme.js"></script>
+</body>
+</html>

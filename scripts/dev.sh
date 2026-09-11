@@ -15,7 +15,7 @@ dotnet build ServerNodeMonitor.slnx -c Debug -nologo -v q
 
 echo "[dev] starting master on $BASE (data: $DATA)"
 SNM_DATA_DIR="$DATA" SNM_LISTEN="$BASE" ASPNETCORE_ENVIRONMENT=Development SNM_ADMIN_PASSWORD="$ADMIN_PASSWORD" \
-  SNM_PUBLIC_BASE_URL="$BASE" Snm__Dev__PublicSourceDir="$(pwd)/web/public" \
+  SNM_PUBLIC_BASE_URL="$BASE" Snm__Dev__WebSourceDir="$(pwd)/web" \
   dotnet run --project src/SNM.Master --no-build &
 MASTER_PID=$!
 cleanup() { echo; echo "[dev] stopping"; kill "$MASTER_PID" "${AGENT_PID:-}" 2>/dev/null || true; wait 2>/dev/null || true; }

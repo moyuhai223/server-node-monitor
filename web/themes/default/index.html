@@ -7,7 +7,7 @@
   <meta name="color-scheme" content="light dark">
   <title>节点状态</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div id="banner" class="banner" hidden></div>
@@ -19,7 +19,7 @@
     <div class="header-side">
       <span id="summary" class="summary">在线 – / –</span>
       <span id="clock" class="clock">--:--:--</span>
-      <button id="theme-toggle" class="theme-toggle" type="button" title="切换主题" aria-label="切换主题">◐</button>
+      <button id="theme-toggle" class="theme-toggle" type="button" title="切换深浅色" aria-label="切换深浅色">◐</button>
     </div>
   </header>
   <main id="grid" class="grid" aria-live="polite">
@@ -30,8 +30,9 @@
     <span class="dot">·</span>
     <span>Powered by Server Node Monitor</span>
   </footer>
-  <script src="vendor/signalr.min.js"></script>
-  <script src="vendor/signalr-protocol-msgpack.min.js"></script>
-  <script type="module" src="js/app.js"></script>
+  <!-- shared SDK bundles are served by the master under /vendor (absolute), theme files are relative -->
+  <script src="/vendor/signalr.min.js"></script>
+  <script src="/vendor/signalr-protocol-msgpack.min.js"></script>
+  <script type="module" src="theme.js"></script>
 </body>
 </html>

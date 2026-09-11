@@ -52,6 +52,10 @@
           </n-form>
         </n-tab-pane>
 
+        <n-tab-pane name="themes" tab="大屏主题">
+          <ThemesTab />
+        </n-tab-pane>
+
         <n-tab-pane name="channels" tab="通知渠道">
           <div class="mb-12 flex justify-end">
             <n-button type="primary" @click="channelModal.open()">
@@ -138,6 +142,7 @@ import { CURRENCIES, RULE_NAMES, TIMEZONES } from '@/constants/snm'
 import { useAuthStore, useSystemStore } from '@/store'
 import { formatBytes, formatDateTime, formatDuration } from '@/utils/format'
 import ChannelFormModal from './ChannelFormModal.vue'
+import ThemesTab from './ThemesTab.vue'
 import api from './api'
 
 const systemStore = useSystemStore()
@@ -164,6 +169,7 @@ async function save(groups, onlyKeys) {
     for (const g of groups) {
       const src = settings.value[g]
       body[g] = onlyKeys ? Object.fromEntries(onlyKeys.map(k => [k, src[k]])) : { ...src }
+      if (g === 'site') { delete body[g].theme; delete body[g].themeOptions }
       if (g === 'geoip')
         body[g] = { enabled: src.enabled }
     }

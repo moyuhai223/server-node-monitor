@@ -7,9 +7,9 @@ FROM --platform=$BUILDPLATFORM node:22-alpine AS web
 RUN apk add --no-cache bash
 WORKDIR /src
 COPY web/admin/package.json web/admin/package-lock.json* web/admin/
-COPY web/public/package.json web/public/package-lock.json* web/public/
+COPY web/sdk/package.json web/sdk/package-lock.json* web/sdk/
 RUN cd web/admin && (npm ci --no-audit --no-fund || npm install --no-audit --no-fund) \
- && cd ../public && (npm ci --no-audit --no-fund || npm install --no-audit --no-fund)
+ && cd ../sdk && (npm ci --no-audit --no-fund || npm install --no-audit --no-fund)
 COPY web/ web/
 COPY scripts/build-web.sh scripts/
 RUN bash scripts/build-web.sh --out /out/wwwroot --skip-install

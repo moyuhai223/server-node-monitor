@@ -43,7 +43,8 @@ src/SNM.Contracts   MessagePack DTO、Hub 常量、AOT 安全的 MessagePack Hub
 src/SNM.Agent       探针(Native AOT,Linux x64/arm64 + Windows x64;只读、不监听、无远程执行、无自更新)
 src/SNM.Master      Master(REST API、三个 SignalR Hub、时序降采样、流量 Delta 计费、告警、Telegram/Webhook、安装脚本)
 web/admin           管理后台(vue-naive-admin 2.x 改造,Vite 8 / Vue 3.5 / Naive UI / ECharts)
-web/public          公开大屏(无框架,仅一条 SignalR 连接)
+web/sdk             大屏主题 SDK(snm-client.js:连接/状态/历史/格式化,构建后位于 /vendor)
+web/themes/<id>     公开大屏主题(内置 default、minimal;纯 HTML/CSS/JS,可打包上传替换,见 docs/THEMES.md)
 tests/              xunit:契约字节等价、探针解析器、Master 集成(WebApplicationFactory + 真实 Hub 往返)
 deploy/             install-master.sh、install-agent.sh/.ps1(同时是 Master 渲染的模板)、systemd、Nginx、Docker
 .github/workflows   agent-aot(三平台 Native AOT)、master-build(测试 + 发行包 + 多架构镜像)
@@ -61,6 +62,10 @@ bash scripts/dev.sh                   # 启动 Master(http://127.0.0.1:5080, adm
 - 后台:`http://127.0.0.1:5080/admin/` · 大屏:`http://127.0.0.1:5080/` · 前端热更新:`cd web/admin && npm run dev`(`http://localhost:3200/admin/`)
 - 测试:`dotnet test ServerNodeMonitor.slnx`;端到端:`bash scripts/e2e.sh`;探针 AOT 门禁:`bash scripts/ilc-check.sh`
 - 发布:`git tag -a vX.Y.Z -m ... && git push origin vX.Y.Z`,GitHub Actions 自动产出探针/Master 发行包与镜像。
+
+## 大屏主题
+
+访客大屏与 Master 解耦:主题只做渲染,数据由 `/vendor/snm-client.js`(SDK)提供。后台 **系统设置 → 大屏主题** 可切换内置主题、上传 zip 主题包、填写主题参数;主题开发与打包(`scripts/pack-theme.sh`)见 [docs/THEMES.md](docs/THEMES.md)。
 
 ## 安全模型
 

@@ -16,6 +16,7 @@ public sealed class RealtimeBroadcaster : SnmBackgroundService
     private readonly LiveSnapshotBuilder _builder;
     private readonly SettingsService _settings;
     private readonly ConcurrentQueue<int[]> _metaChanges = new();
+    private volatile bool _siteChanged;
 
     public RealtimeBroadcaster(IHubContext<PublicHub> publicHub, IHubContext<AdminHub> adminHub, LiveSnapshotBuilder builder,
         SettingsService settings, NodeRegistry registry, ILogger<RealtimeBroadcaster> logger) : base(logger, registry)
@@ -29,6 +30,8 @@ public sealed class RealtimeBroadcaster : SnmBackgroundService
         {
             if (keys.Any(k => k.StartsWith("site.public", StringComparison.Ordinal) || k.StartsWith("public.", StringComparison.Ordinal) || k == "alert.offlineTimeoutSec"))
                 _metaChanges.Enqueue([]);
+            if (keys.Any(k => k is "site.theme" or "site.themeOptions" or "site.publicTitle" or "site.publicSubtitle" || k.StartsWith("public.", StringComparison.Ordinal)))
+                _siteChanged = true;
         };
     }
 
@@ -72,6 +75,13 @@ public sealed class RealtimeBroadcaster : SnmBackgroundService
             await _publicHub.Clients.All.SendAsync(PublicHubMethods.Batch, new PublicBatchDto { ServerTs = ts, Items = publicItems.ToArray() }, ct);
         if (adminItems.Count > 0)
             await _adminHub.Clients.All.SendAsync(AdminHubMethods.Batch, new AdminBatchDto { ServerTs = ts, Items = adminItems.ToArray() }, ct);
+
+        if (_siteChanged)
+        {
+            _siteChanged = false;
+            // Site-level changes (title, theme, theme options) are delivered as a full snapshot so themes can re-render or reload.
+            await _publicHub.Clients.All.SendAsync(PublicHubMethods.Snapshot, _builder.PublicSnapshot(now), ct);
+        }
 
         if (!_metaChanges.IsEmpty)
         {

@@ -14,6 +14,10 @@ public sealed class PublicSiteDto
     [Key("showSpecs")] public bool ShowSpecs { get; set; }
     [Key("showTraffic")] public bool ShowTraffic { get; set; }
     [Key("offlineSec")] public int OfflineTimeoutSec { get; set; }
+    /// <summary>Id of the active public theme; themes reload when it changes.</summary>
+    [Key("theme")] public string Theme { get; set; } = "default";
+    /// <summary>Free-form JSON string with theme options edited by the admin (site.themeOptions).</summary>
+    [Key("opts")] public string ThemeOptions { get; set; } = "";
 }
 
 [MessagePackObject]

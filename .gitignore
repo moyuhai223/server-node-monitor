@@ -27,7 +27,7 @@ web/**/dist/
 # Built web assets are produced by scripts/build-web.sh, not committed
 src/SNM.Master/wwwroot/*
 !src/SNM.Master/wwwroot/.gitkeep
-web/public/vendor/
+web/sdk/dist/
 
 # OS / editor
 .DS_Store

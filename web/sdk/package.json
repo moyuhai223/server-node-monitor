@@ -1,0 +1,10 @@
+{
+  "name": "snm-theme-sdk",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Server Node Monitor public dashboard SDK (snm-client.js) + SignalR browser bundles copied by scripts/build-web.sh.",
+  "devDependencies": {
+    "@microsoft/signalr": "10.0.11",
+    "@microsoft/signalr-protocol-msgpack": "10.0.11"
+  }
+}

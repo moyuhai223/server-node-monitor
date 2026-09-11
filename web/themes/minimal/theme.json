@@ -1,0 +1,11 @@
+{
+  "id": "minimal",
+  "name": "极简列表",
+  "version": "1.0.0",
+  "author": "Server Node Monitor",
+  "description": "深色表格式布局,信息密度高,适合大量节点或作为主题开发的最小参考实现。",
+  "homepage": "https://github.com/moyuhai223/server-node-monitor",
+  "entry": "index.html",
+  "preview": "preview.svg",
+  "sdk": 1
+}

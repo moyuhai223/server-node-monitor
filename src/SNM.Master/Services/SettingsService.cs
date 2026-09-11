@@ -21,6 +21,8 @@ public sealed class SettingsSnapshot
     public TimeZoneInfo TimeZone = TimeZoneInfo.Utc;
     public bool ShowSpecs = true;
     public bool ShowTraffic = true;
+    public string Theme = "default";
+    public string ThemeOptions = "";
     public string ReleaseBaseUrl = "";
     public int DefaultIntervalMs = 2000;
     public int StatusIntervalSec = 300;
@@ -97,6 +99,16 @@ public sealed class SettingsService(IDbContextFactory<SnmDbContext> dbFactory, I
 
     private static readonly Func<JsonElement, string?> Any = _ => null;
 
+    private static readonly Func<JsonElement, string?> JsonTextOrEmpty = e =>
+    {
+        if (e.ValueKind != JsonValueKind.String) return "必须是字符串";
+        var s = e.GetString()!;
+        if (s.Length == 0) return null;
+        if (s.Length > 8000) return "长度不能超过 8000";
+        try { using var doc = JsonDocument.Parse(s); return doc.RootElement.ValueKind == JsonValueKind.Object ? null : "必须是 JSON 对象"; }
+        catch (JsonException) { return "不是合法的 JSON"; }
+    };
+
     private static readonly IReadOnlyDictionary<string, Def> Defs = new Dictionary<string, Def>
     {
         ["site.title"] = new("\"Server Node Monitor\"", Str(1, 64)),
@@ -106,6 +118,8 @@ public sealed class SettingsService(IDbContextFactory<SnmDbContext> dbFactory, I
         ["site.timeZone"] = new("\"UTC\"", TimeZoneId),
         ["public.showSpecs"] = new("true", Bool),
         ["public.showTraffic"] = new("true", Bool),
+        ["site.theme"] = new("\"default\"", Str(2, 32)),
+        ["site.themeOptions"] = new("\"\"", JsonTextOrEmpty),
         ["agent.releaseBaseUrl"] = new("\"https://github.com/moyuhai223/server-node-monitor/releases/latest/download\"", HttpUrlOrEmpty),
         ["agent.defaultIntervalMs"] = new("2000", Int(1000, 60000)),
         ["agent.statusIntervalSec"] = new("300", Int(60, 3600)),
@@ -291,6 +305,8 @@ public sealed class SettingsService(IDbContextFactory<SnmDbContext> dbFactory, I
             TimeZoneId = GetString("site.timeZone"),
             ShowSpecs = GetBool("public.showSpecs"),
             ShowTraffic = GetBool("public.showTraffic"),
+            Theme = GetString("site.theme"),
+            ThemeOptions = GetString("site.themeOptions"),
             ReleaseBaseUrl = GetString("agent.releaseBaseUrl").TrimEnd('/'),
             DefaultIntervalMs = GetInt("agent.defaultIntervalMs"),
             StatusIntervalSec = GetInt("agent.statusIntervalSec"),

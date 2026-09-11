@@ -1,0 +1,11 @@
+{
+  "id": "default",
+  "name": "默认卡片",
+  "version": "1.1.0",
+  "author": "Server Node Monitor",
+  "description": "响应式卡片网格,自动深浅色,CPU/内存/磁盘进度条、流量进度与 2 分钟实时波形。",
+  "homepage": "https://github.com/moyuhai223/server-node-monitor",
+  "entry": "index.html",
+  "preview": "preview.svg",
+  "sdk": 1
+}

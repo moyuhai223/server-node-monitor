@@ -55,7 +55,21 @@ public sealed class SnmOptions
 
     public sealed class DevOptions
     {
-        /// <summary>Development only: serve the public dashboard straight from this source directory (web/public).</summary>
-        public string PublicSourceDir { get; set; } = "";
+        /// <summary>Development only: serve themes from &lt;dir&gt;/themes and the SDK bundles from &lt;dir&gt;/sdk/dist (the repository's web/ folder).</summary>
+        public string WebSourceDir { get; set; } = "";
+    }
+
+    public ThemesOptions Themes { get; set; } = new();
+
+    public sealed class ThemesOptions
+    {
+        /// <summary>Built-in themes shipped with the master (relative to the content root).</summary>
+        public string BuiltInDir { get; set; } = "wwwroot/themes";
+
+        /// <summary>User-installed themes (default: &lt;DataDir&gt;/themes).</summary>
+        public string UserDir { get; set; } = "";
+
+        /// <summary>Maximum theme package size accepted by the upload endpoint.</summary>
+        public long MaxUploadBytes { get; set; } = 20 * 1024 * 1024;
     }
 }
