@@ -45,6 +45,8 @@ my-theme/
 }
 ```
 
+脚手架:`scripts/new-theme.sh my-theme "我的主题" [目标目录]`(从内置 `minimal` 复制出一个可直接运行的主题,含 README;目标目录默认 `web/themes/my-theme`,给一个仓库外的路径即可作为独立主题仓库的起点)。
+
 打包:`scripts/pack-theme.sh web/themes/my-theme` → `snm-theme-my-theme-1.0.0.zip`(清单可以在 zip 根或单层子目录内;非白名单扩展名会被跳过/拒绝;解压后 ≤ 20 MB,可用 `Snm:Themes:MaxUploadBytes` 调整)。
 
 ## 3. 最小主题

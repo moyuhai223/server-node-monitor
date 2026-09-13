@@ -39,8 +39,10 @@ rm -rf "$OUT_ABS/themes"; mkdir -p "$OUT_ABS/themes"
 for t in web/themes/*/; do
   id=$(basename "$t")
   [ -f "$t/theme.json" ] || { echo "skip $t (no theme.json)"; continue; }
+  # plain cp -R (no GNU --parents: the Docker web stage runs on busybox), then drop dev-only files
   mkdir -p "$OUT_ABS/themes/$id"
-  (cd "$t" && find . -type f ! -path './node_modules/*' ! -name 'package-lock.json' ! -name 'package.json' -exec cp --parents {} "$OUT_ABS/themes/$id/" \;)
+  cp -R "$t/." "$OUT_ABS/themes/$id/"
+  rm -rf "$OUT_ABS/themes/$id/node_modules" "$OUT_ABS/themes/$id/package-lock.json" "$OUT_ABS/themes/$id/package.json" "$OUT_ABS/themes/$id/.git"
 done
 # legacy files from older builds
 rm -f "$OUT_ABS/index.html" "$OUT_ABS/favicon.svg"; rm -rf "$OUT_ABS/css" "$OUT_ABS/js"

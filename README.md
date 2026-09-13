@@ -65,7 +65,7 @@ bash scripts/dev.sh                   # 启动 Master(http://127.0.0.1:5080, adm
 
 ## 大屏主题
 
-访客大屏与 Master 解耦:主题只做渲染,数据由 `/vendor/snm-client.js`(SDK)提供。后台 **系统设置 → 大屏主题** 可切换内置主题、上传 zip 主题包、填写主题参数;主题开发与打包(`scripts/pack-theme.sh`)见 [docs/THEMES.md](docs/THEMES.md)。
+访客大屏与 Master 解耦:主题只做渲染,数据由 `/vendor/snm-client.js`(SDK)提供。后台 **系统设置 → 大屏主题** 可切换内置主题、上传 zip 主题包、填写主题参数;主题开发:`scripts/new-theme.sh <id> <名称> [目录]` 生成脚手架,`scripts/pack-theme.sh <目录>` 打包;详见 [docs/THEMES.md](docs/THEMES.md)。
 
 ## 安全模型
 
