@@ -7,13 +7,13 @@
 ### 服务端(Linux x86_64 / aarch64,systemd)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/moyuhai223/server-node-monitor/main/deploy/install-master.sh | sudo bash -s -- --public-url https://m.example.com
+curl -fsSL https://raw.githubusercontent.com/moyuhai223/server-node-monitor/main/deploy/install-master.sh | bash -s -- --public-url https://m.example.com
 ```
 
 - 下载最新 Release 并校验 sha256,创建 `snm-master` 系统用户,程序装到 `/opt/snm-master`,数据 `/var/lib/snm-master`,配置 `/etc/snm-master/master.env`(0600),注册 systemd 服务并等待 `/healthz`。
 - 默认只监听 `127.0.0.1:5080`;首次安装若未给 `--admin-password` 会生成随机密码并**只打印一次**。
 - 反向代理:加 `--nginx m.example.com` 自动写入 Nginx 站点(HTTP,`/hubs/` 已开 WebSocket),随后 `certbot --nginx -d m.example.com` 上 TLS;用 1Panel 的话在面板里把域名反代到 `127.0.0.1:5080` 并开启 WebSocket。
-- 升级:重跑同一条命令(会先停服务并备份数据库到 `backups/`);状态:`... | sudo bash -s -- status`;卸载:`... | sudo bash -s -- uninstall`(加 `--purge` 连数据一起删)。
+- 升级:重跑同一条命令(会先停服务并备份数据库到 `backups/`);状态:`... | bash -s -- status`;卸载:`... | bash -s -- uninstall`(加 `--purge` 连数据一起删)。
 - 其他选项:`--port`、`--listen`、`--data-dir`、`--timezone`、`--version vX.Y.Z`、`--yes`(免交互)、`--dry-run`。容器部署见 [deploy/docker](deploy/docker)。
 
 ### 探针(被监控的服务器)
@@ -23,7 +23,7 @@ curl -fsSL https://raw.githubusercontent.com/moyuhai223/server-node-monitor/main
 方式二(手动传参,Linux):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/moyuhai223/server-node-monitor/main/deploy/install-agent.sh | sudo bash -s -- --server https://m.example.com --key snmk_xxxxxxxx
+curl -fsSL https://raw.githubusercontent.com/moyuhai223/server-node-monitor/main/deploy/install-agent.sh | bash -s -- --server https://m.example.com --key snmk_xxxxxxxx
 ```
 
 Windows x64(管理员 PowerShell):

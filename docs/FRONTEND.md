@@ -265,7 +265,7 @@ actions:`connect()`(需要 token;`state='connecting'`;`start()` 后 `state='conn
 
 创建成功后自动打开 **安装脚本弹窗** 并展示一次性的完整 Key 提示。
 
-**安装脚本弹窗 `InstallScriptModal`**:页签 `Linux` / `Windows`;顶部一键命令(`n-input readonly` + 复制按钮);说明行“令牌有效期至 {expiresAt},脚本内含该节点专属密钥,请勿泄露”;`重新生成令牌` 按钮(`renew=true`);可折叠 `查看完整脚本`(`n-code` 等宽);`带代理安装` 提示:`| sudo bash -s -- --proxy socks5://10.0.0.1:1080`。
+**安装脚本弹窗 `InstallScriptModal`**:页签 `Linux` / `Windows`;顶部一键命令(`n-input readonly` + 复制按钮);说明行“令牌有效期至 {expiresAt},脚本内含该节点专属密钥,请勿泄露”;`重新生成令牌` 按钮(`renew=true`);可折叠 `查看完整脚本`(`n-code` 等宽);`带代理安装` 提示:`| bash -s -- --proxy socks5://10.0.0.1:1080`。
 
 **查看密钥 `KeyRevealModal`**:二次确认 → `reveal-key` → 显示 Key + 复制;**轮换密钥**:`$dialog.warning('轮换后旧密钥立即失效,需要重新安装或更新探针配置')` → 成功后显示新 Key。
 

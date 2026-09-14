@@ -77,7 +77,7 @@ public sealed class InstallScriptService(IDbContextFactory<SnmDbContext> dbFacto
         var script = Render(os, node.Meta, baseUrl);
         var (oneLiner, uninstall) = os == "windows"
             ? ($"irm \"{url}?os=windows\" | iex", $"$env:SNM_UNINSTALL = \"1\"; irm \"{url}?os=windows\" | iex")
-            : ($"curl -fsSL {url} | sudo bash", $"curl -fsSL {url} | sudo bash -s -- uninstall");
+            : ($"curl -fsSL {url} | bash", $"curl -fsSL {url} | bash -s -- uninstall");
         return new InstallScriptInfo(os, token.Token, token.ExpiresAt, url, oneLiner, uninstall, script);
     }
 

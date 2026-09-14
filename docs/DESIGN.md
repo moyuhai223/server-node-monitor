@@ -18,7 +18,7 @@
 | 6 | REST 与模板兼容 | 服务端兼容模板登录/用户/菜单接口 + 新增 refresh;统一 `{code,message,data}`;`pageNo/pageSize → pageData/total` | API |
 | 7 | 实时推送 | 三 Hub 均 MessagePack;连接即 `snapshot`(含 60 点环形缓冲),每 2 s `batch`(仅 dirty 节点);浏览器 DTO string-Key | PROTOCOL §5–§6 |
 | 8 | Agent 采集与网络 | `/proc`+`DriveInfo`(Linux)、`LibraryImport` Win32(Windows);`NetworkInformation` 发现 IP;`--proxy` 同时作用于 HTTP 与 WebSocket(IL 证实);WS→LongPolling 回退;永不放弃的指数退避 | PROTOCOL §7 |
-| 9 | 安装脚本 | 后台生成 24 h 一次性令牌 URL,`curl -fsSL …/install/<token> \| sudo bash`;脚本幂等、校验 sha256、非 root 用户、systemd、`uninstall` | API §4.10、DEPLOY §4 |
+| 9 | 安装脚本 | 后台生成 24 h 一次性令牌 URL,`curl -fsSL …/install/<token> \| bash`;脚本幂等、校验 sha256、非 root 用户、systemd、`uninstall` | API §4.10、DEPLOY §4 |
 | 10 | 测试策略 | 单元(字节等价/Delta/降采样/防抖/账期/GeoIP/proc 解析)+ 集成(`WebApplicationFactory` + 真实 SignalR 客户端 + 临时 SQLite)+ 前端构建 + `scripts/e2e.sh` | 本文 §9 |
 
 ---

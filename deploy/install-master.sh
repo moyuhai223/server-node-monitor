@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Server Node Monitor - master (server) one-click installer for Linux x86_64 / aarch64 with systemd.
 #
-#   curl -fsSL https://raw.githubusercontent.com/moyuhai223/server-node-monitor/main/deploy/install-master.sh | sudo bash -s -- --public-url https://m.example.com
+#   curl -fsSL https://raw.githubusercontent.com/moyuhai223/server-node-monitor/main/deploy/install-master.sh | bash -s -- --public-url https://m.example.com
 #   bash <(curl -fsSL https://raw.githubusercontent.com/moyuhai223/server-node-monitor/main/deploy/install-master.sh)
 #
 # Commands
@@ -134,7 +134,7 @@ env_get() { sed -n "s/^$1=//p" "$ENV_FILE" 2>/dev/null | head -1; }
 os_check() {
   if [ "$DRY_RUN" != 1 ]; then
     [ "$(uname -s)" = Linux ] || die "this installer supports Linux only (for other hosts use the Docker image, see deploy/docker)"
-    [ "$(id -u)" -eq 0 ] || die "please run as root (sudo)"
+    [ "$(id -u)" -eq 0 ] || die "please run as root"
     have systemctl || die "systemd is required"
     if ldd --version 2>&1 | grep -qi musl || [ -f /etc/alpine-release ]; then
       die "musl-based systems (Alpine) are not supported by the published build; use the Docker image"

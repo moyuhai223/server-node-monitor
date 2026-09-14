@@ -11,7 +11,7 @@
 | # | 定案 | 理由 |
 |---|---|---|
 | Q6 | **服务端兼容模板期望的登录/用户/权限接口 + 少量前端改造**。服务端实现 `POST /api/auth/login`、`GET /api/user/detail`、`GET /api/role/permissions/tree`、`GET /api/permission/menu/validate`、`POST /api/auth/logout`、`POST /api/auth/password`、`PATCH /api/user/profile/{id}`,并新增 `POST /api/auth/refresh`;响应包 `{code, message, data}`(`code=0` 成功);分页入参 `pageNo/pageSize`、出参 `data.pageData/total`(模板 `MeCrud` 约定)。前端改造清单见 FRONTEND.md §2 | 模板的 `permission-guard`/`store/helper`/`interceptors` 已实现完整的登录态与动态菜单流程,复用成本最低;改造点集中在 `.env`、`vite.config.js`、`http/helpers.js`、`login/index.vue`、`api/index.js`、`settings.js` |
-| Q9 | 后台 `GET /api/nodes/{id}/install-script` 返回一次性令牌 URL 与脚本正文;`GET /install/{token}`(公开、24 h 有效、限速)返回渲染好的 bash 脚本,一键命令 `curl -fsSL https://m.example.com/install/<token> \| sudo bash`;脚本模板见 DEPLOY.md §4 | 脚本内含 AgentKey,必须用短期令牌而非 JWT(目标机上没有 JWT) |
+| Q9 | 后台 `GET /api/nodes/{id}/install-script` 返回一次性令牌 URL 与脚本正文;`GET /install/{token}`(公开、24 h 有效、限速)返回渲染好的 bash 脚本,一键命令 `curl -fsSL https://m.example.com/install/<token> \| bash`;脚本模板见 DEPLOY.md §4 | 脚本内含 AgentKey,必须用短期令牌而非 JWT(目标机上没有 JWT) |
 
 ---
 
@@ -264,8 +264,8 @@
   "os": "linux",
   "token": "fM3xQ9…(43 chars)", "expiresAt": "2026-09-08T02:13:22Z",
   "url": "https://m.example.com/install/fM3xQ9…",
-  "oneLiner": "curl -fsSL https://m.example.com/install/fM3xQ9… | sudo bash",
-  "uninstallOneLiner": "curl -fsSL https://m.example.com/install/fM3xQ9… | sudo bash -s -- uninstall",
+  "oneLiner": "curl -fsSL https://m.example.com/install/fM3xQ9… | bash",
+  "uninstallOneLiner": "curl -fsSL https://m.example.com/install/fM3xQ9… | bash -s -- uninstall",
   "script": "#!/usr/bin/env bash\nset -euo pipefail\n# Server Node Monitor agent installer (generated 2026-09-07T02:13:22Z for node HK-Node-01)\n..." } }
 ```
 

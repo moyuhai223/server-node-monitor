@@ -6,8 +6,8 @@
 
 | 脚本 | 用途 | 命令 |
 |---|---|---|
-| `deploy/install-master.sh` | 服务端:下载 Release 包 → 校验 sha256 → 创建 `snm-master` 用户 → `/opt/snm-master` + `/var/lib/snm-master` + `/etc/snm-master/master.env` → systemd → 等待 `/healthz`;可选 `--nginx DOMAIN` 写反代站点;`upgrade` 自动备份数据库;`uninstall [--purge]`;`status` | `curl -fsSL https://raw.githubusercontent.com/moyuhai223/server-node-monitor/main/deploy/install-master.sh \| sudo bash -s -- --public-url https://m.example.com` |
-| `deploy/install-agent.sh` | 探针(Linux):既是 Master 在 `/install/<token>` 渲染的模板(`{{SERVER_URL}}` / `{{AGENT_KEY}}` / `{{RELEASE_BASE_URL}}` 被填入),也可独立运行,参数/环境变量优先级高于模板值 | `curl -fsSL .../deploy/install-agent.sh \| sudo bash -s -- --server https://m.example.com --key snmk_xxx [--proxy socks5://...]` |
+| `deploy/install-master.sh` | 服务端:下载 Release 包 → 校验 sha256 → 创建 `snm-master` 用户 → `/opt/snm-master` + `/var/lib/snm-master` + `/etc/snm-master/master.env` → systemd → 等待 `/healthz`;可选 `--nginx DOMAIN` 写反代站点;`upgrade` 自动备份数据库;`uninstall [--purge]`;`status` | `curl -fsSL https://raw.githubusercontent.com/moyuhai223/server-node-monitor/main/deploy/install-master.sh \| bash -s -- --public-url https://m.example.com` |
+| `deploy/install-agent.sh` | 探针(Linux):既是 Master 在 `/install/<token>` 渲染的模板(`{{SERVER_URL}}` / `{{AGENT_KEY}}` / `{{RELEASE_BASE_URL}}` 被填入),也可独立运行,参数/环境变量优先级高于模板值 | `curl -fsSL .../deploy/install-agent.sh \| bash -s -- --server https://m.example.com --key snmk_xxx [--proxy socks5://...]` |
 | `deploy/install-agent.ps1` | 探针(Windows x64):同上,值来自 `$env:SNM_SERVER` / `$env:SNM_KEY`(或 Master 渲染) | `$env:SNM_SERVER='https://m.example.com'; $env:SNM_KEY='snmk_xxx'; irm .../deploy/install-agent.ps1 \| iex` |
 
 单文件自包含的 Master 需要一个可写目录解压原生库,安装脚本在 unit 里设置 `DOTNET_BUNDLE_EXTRACT_BASE_DIR=/var/lib/snm-master/.net`(与 `ProtectSystem=strict` + `ReadWritePaths` 配合)。以下为设计文档原文。
@@ -44,11 +44,11 @@
 ### 2.1 目录与用户
 
 ```bash
-sudo useradd --system --home /var/lib/snm-master --shell /usr/sbin/nologin snm-master
-sudo mkdir -p /opt/snm-master /var/lib/snm-master /etc/snm-master
-sudo tar xzf snm-master-linux-x64.tar.gz -C /opt/snm-master
-sudo chown -R root:root /opt/snm-master && sudo chmod 755 /opt/snm-master/SNM.Master
-sudo chown -R snm-master:snm-master /var/lib/snm-master
+useradd --system --home /var/lib/snm-master --shell /usr/sbin/nologin snm-master
+mkdir -p /opt/snm-master /var/lib/snm-master /etc/snm-master
+tar xzf snm-master-linux-x64.tar.gz -C /opt/snm-master
+chown -R root:root /opt/snm-master && chmod 755 /opt/snm-master/SNM.Master
+chown -R snm-master:snm-master /var/lib/snm-master
 ```
 
 `/etc/snm-master/master.env`(`chmod 600 root:root`):
@@ -104,9 +104,9 @@ WantedBy=multi-user.target
 ```
 
 ```bash
-sudo cp deploy/systemd/snm-master.service /etc/systemd/system/
-sudo systemctl daemon-reload && sudo systemctl enable --now snm-master
-sudo journalctl -u snm-master -f      # 首次启动会打印随机管理员密码(若未设置 SNM_ADMIN_PASSWORD)
+cp deploy/systemd/snm-master.service /etc/systemd/system/
+systemctl daemon-reload && systemctl enable --now snm-master
+journalctl -u snm-master -f      # 首次启动会打印随机管理员密码(若未设置 SNM_ADMIN_PASSWORD)
 ```
 
 ### 2.3 Nginx(`deploy/nginx/snm.conf`)
@@ -240,7 +240,7 @@ services:
 curl -fsSLO https://github.com/moyuhai223/server-node-monitor/releases/latest/download/snm-agent-linux-x64.tar.gz
 curl -fsSLO https://github.com/moyuhai223/server-node-monitor/releases/latest/download/snm-agent-linux-x64.tar.gz.sha256
 sha256sum -c snm-agent-linux-x64.tar.gz.sha256
-sudo mkdir -p /opt/snm-agent && sudo tar xzf snm-agent-linux-x64.tar.gz -C /opt/snm-agent
+mkdir -p /opt/snm-agent && tar xzf snm-agent-linux-x64.tar.gz -C /opt/snm-agent
 /opt/snm-agent/snm-agent --version
 /opt/snm-agent/snm-agent test                      # 本机采集自检,不联网
 SNM_SERVER=https://m.example.com SNM_KEY=snmk_... /opt/snm-agent/snm-agent run
@@ -255,9 +255,9 @@ SNM_SERVER=https://m.example.com SNM_KEY=snmk_... /opt/snm-agent/snm-agent run
 Master 渲染规则(`InstallScriptService`):占位符 `{{SERVER_URL}}`(`site.publicBaseUrl` 或推导)、`{{AGENT_KEY}}`、`{{RELEASE_BASE_URL}}`(`agent.releaseBaseUrl`)、`{{NODE_NAME}}`(PublicName,仅注释)、`{{GENERATED_AT}}`、`{{MASTER_VERSION}}`。所有值经白名单校验(URL `^https?://[A-Za-z0-9.\-:/_]+$`,Key `^snmk_[A-Za-z0-9_-]{43}$`),渲染为单引号包裹的 bash 字面量。脚本用法:
 
 ```
-curl -fsSL https://m.example.com/install/<token> | sudo bash                          # 安装/升级
-curl -fsSL https://m.example.com/install/<token> | sudo bash -s -- --proxy socks5://10.0.0.1:1080
-curl -fsSL https://m.example.com/install/<token> | sudo bash -s -- uninstall
+curl -fsSL https://m.example.com/install/<token> | bash                          # 安装/升级
+curl -fsSL https://m.example.com/install/<token> | bash -s -- --proxy socks5://10.0.0.1:1080
+curl -fsSL https://m.example.com/install/<token> | bash -s -- uninstall
 ```
 
 ```bash
@@ -295,7 +295,7 @@ while [ $# -gt 0 ]; do
   esac; shift
 done
 
-[ "$(id -u)" -eq 0 ] || die "please run as root (sudo)"
+[ "$(id -u)" -eq 0 ] || die "please run as root"
 command -v systemctl >/dev/null 2>&1 || die "systemd is required"
 [ "$(uname -s)" = Linux ] || die "this installer supports Linux only; see docs for Windows"
 
@@ -652,10 +652,10 @@ Agent 侧环境变量见 PROTOCOL.md §7.2(`SNM_SERVER`、`SNM_KEY`、`SNM_PROXY
 ### 7.3 升级 Master
 
 ```bash
-sudo systemctl stop snm-master
+systemctl stop snm-master
 sqlite3 /var/lib/snm-master/snm.db "VACUUM INTO '/var/lib/snm-master/backups/pre-upgrade-$(date +%F).db'"
-sudo tar xzf snm-master-linux-x64.tar.gz -C /opt/snm-master        # 覆盖二进制与 wwwroot;appsettings.json 若被覆盖,配置在 env 文件不受影响
-sudo systemctl start snm-master
+tar xzf snm-master-linux-x64.tar.gz -C /opt/snm-master        # 覆盖二进制与 wwwroot;appsettings.json 若被覆盖,配置在 env 文件不受影响
+systemctl start snm-master
 journalctl -u snm-master -n 50 --no-pager | grep -E 'Applied migration|listening|version'
 curl -s http://127.0.0.1:5080/healthz
 ```
@@ -664,7 +664,7 @@ Docker:`docker compose pull && docker compose up -d`(卷内数据自动迁移)�
 
 ### 7.4 升级 Agent
 
-- 再次执行后台的一键安装命令(幂等:校验、替换二进制、重启服务;配置不变),或 `sudo bash install.sh --version v1.1.0` 固定版本。
+- 再次执行后台的一键安装命令(幂等:校验、替换二进制、重启服务;配置不变),或 `bash install.sh --version v1.1.0` 固定版本。
 - 批量:在管理后台复制各节点命令;或用现有配置管理工具分发同一脚本(脚本内含节点专属 Key,不能跨节点复用)。
 - 协议兼容:同主版本 `ProtocolVersion` 内新旧混跑安全(PROTOCOL §8)。
 

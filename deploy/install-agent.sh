@@ -3,11 +3,11 @@
 #
 # Standalone (values from arguments or environment):
 #   curl -fsSL https://raw.githubusercontent.com/moyuhai223/server-node-monitor/main/deploy/install-agent.sh \
-#     | sudo bash -s -- --server https://m.example.com --key snmk_xxxxxxxx [--proxy socks5://10.0.0.1:1080] [--net-if eth0]
+#     | bash -s -- --server https://m.example.com --key snmk_xxxxxxxx [--proxy socks5://10.0.0.1:1080] [--net-if eth0]
 # Served by a master with the node's values pre-filled (节点管理 → 安装脚本):
-#   curl -fsSL https://m.example.com/install/<token> | sudo bash
+#   curl -fsSL https://m.example.com/install/<token> | bash
 # Uninstall / status:
-#   ... | sudo bash -s -- uninstall        ... | sudo bash -s -- status
+#   ... | bash -s -- uninstall        ... | bash -s -- status
 #
 # Rendered {{GENERATED_AT}} by master {{MASTER_VERSION}} for node "{{NODE_NAME}}" (placeholders stay literal in the standalone copy).
 set -euo pipefail
@@ -86,7 +86,7 @@ SNM_SERVER=${SNM_SERVER%/}
 
 if [ "$DRY_RUN" != 1 ]; then
   [ "$(uname -s)" = Linux ] || die "this installer supports Linux only; for Windows use install-agent.ps1 (or ?os=windows on the master)"
-  [ "$(id -u)" -eq 0 ] || die "please run as root (sudo)"
+  [ "$(id -u)" -eq 0 ] || die "please run as root"
   command -v systemctl >/dev/null 2>&1 || die "systemd is required"
 fi
 
