@@ -63,6 +63,7 @@ public sealed class PublicNodeDto
     [Key("tLimit")] public ulong TrafficLimitBytes { get; set; }
     [Key("live")] public PublicNodeLiveDto Live { get; set; } = new();
     [Key("hist")] public PublicHistoryDto? Hist { get; set; }
+    [Key("probes")] public PublicProbeDto[] Probes { get; set; } = [];
 }
 
 [MessagePackObject]

@@ -11,9 +11,9 @@ using SNM.Master.Services;
 
 namespace SNM.Master.Hubs;
 
-/// <summary>/hubs/agent - MessagePack, AgentKey auth. Only three uplink methods; the only downlink is "configure".</summary>
+/// <summary>/hubs/agent - MessagePack, AgentKey auth. Performance + fixed network probes; no remote commands.</summary>
 [Authorize(AuthenticationSchemes = AgentKeyAuthenticationHandler.SchemeName, Roles = "agent")]
-public sealed class AgentHub(NodeRegistry registry, NodeIngestService ingest, AgentConnectionTracker tracker, ILogger<AgentHub> logger) : Hub
+public sealed class AgentHub(NodeRegistry registry, NodeIngestService ingest, AgentConnectionTracker tracker, ProbeService probes, ILogger<AgentHub> logger) : Hub
 {
     private const string NodeIdKey = "nodeId";
     private const string RemoteIpKey = "remoteIp";
@@ -102,6 +102,25 @@ public sealed class AgentHub(NodeRegistry registry, NodeIngestService ingest, Ag
                 logger.LogDebug("Node {NodeId}: duplicate/out-of-order heartbeat dropped", node.Id);
                 return;
         }
+    }
+
+    [HubMethodName(AgentHubMethods.GetProbes)]
+    public ProbeConfigDto GetProbes()
+    {
+        var node = CurrentNode() ?? throw new HubException("node not found");
+        lock (node.Sync)
+        {
+            if (!node.Registered || node.ConnectionId != Context.ConnectionId) throw new HubException("register first");
+            return probes.Configuration(node);
+        }
+    }
+
+    [HubMethodName(AgentHubMethods.ProbeResult)]
+    public Task ProbeResult(ProbeResultDto result)
+    {
+        var node = CurrentNode();
+        if (node is not null) probes.Accept(node, Context.ConnectionId, result, DateTime.UtcNow);
+        return Task.CompletedTask;
     }
 }
 

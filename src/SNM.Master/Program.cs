@@ -105,6 +105,7 @@ builder.Services.AddSingleton<AdminUserService>();
 builder.Services.AddSingleton<NodeService>();
 builder.Services.AddSingleton<InstallScriptService>();
 builder.Services.AddSingleton<ThemeService>();
+builder.Services.AddSingleton<ProbeService>();
 builder.Services.AddSingleton<DashboardService>();
 builder.Services.AddSingleton<AlertQueryService>();
 builder.Services.AddSingleton<HubStats>();
@@ -242,6 +243,7 @@ NodesEndpoints.Map(app);
 AlertsEndpoints.Map(app);
 SettingsEndpoints.Map(app);
 ThemesEndpoints.Map(app);
+ProbesEndpoints.Map(app);
 SystemEndpoints.Map(app);
 
 var webRoot = app.Environment.WebRootPath ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot");

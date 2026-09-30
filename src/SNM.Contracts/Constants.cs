@@ -15,6 +15,8 @@ public static class AgentHubMethods
     public const string Register = "register";      // InvokeAsync<AgentConfigDto>(RegisterDto)
     public const string Heartbeat = "hb";            // SendAsync(HeartbeatDto)
     public const string ReportStatus = "status";     // SendAsync(StatusReportDto)
+    public const string GetProbes = "getProbes";
+    public const string ProbeResult = "probe";
 
     // master -> agent (the complete set of downlink messages)
     public const string Configure = "configure";     // AgentConfigDto

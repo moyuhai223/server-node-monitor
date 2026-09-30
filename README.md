@@ -67,6 +67,10 @@ bash scripts/dev.sh                   # 启动 Master(http://127.0.0.1:5080, adm
 
 访客大屏与 Master 解耦:主题只做渲染,数据由 `/vendor/snm-client.js`(SDK)提供。后台 **系统设置 → 大屏主题** 可切换内置主题、上传 zip 主题包、填写主题参数;主题开发:`scripts/new-theme.sh <id> <名称> [目录]` 生成脚手架,`scripts/pack-theme.sh <目录>` 打包;详见 [docs/THEMES.md](docs/THEMES.md)。
 
+## 延时探测
+
+新增 **Panorama 全景** 主题（卡片/列表、搜索、状态筛选、深浅色、移动端及线路趋势）。在 **系统设置 → 延时探测** 配置节点到指定目标的 ICMP/TCP 测量，再到 **大屏主题** 启用 Panorama。需要同时更新 Master、Web SDK 与参与探测的 Agent；旧 Agent 的性能上报继续兼容。详见 [延时探测使用说明](docs/PROBES.md)。
+
 ## 安全模型
 
 探针只持有节点专属 `AgentKey`,通过 `X-SNM-Agent-Key` 头连接 `/hubs/agent`;Master 对探针的下行消息只有 `configure`(采集间隔)。管理端为 JWT(access + 轮换 refresh),公开大屏只暴露脱敏字段(有测试保证)。

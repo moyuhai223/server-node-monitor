@@ -23,6 +23,7 @@ public sealed class PublicDtoLeakTests
     [
         [typeof(PublicSnapshotDto)], [typeof(PublicSiteDto)], [typeof(PublicNodeDto)], [typeof(PublicNodeLiveDto)],
         [typeof(PublicHistoryDto)], [typeof(PublicBatchDto)],
+        [typeof(PublicProbeDto)], [typeof(PublicProbePointDto)], [typeof(PublicProbeBatchDto)],
     ];
 
     [Theory]

@@ -129,6 +129,11 @@ function pushPoint(hist, live, max) {
 // ---------------------------------------------------------------- client
 export const STATUS = { UNKNOWN: 0, ONLINE: 1, OFFLINE: 2 };
 
+function normalizeProbes(probes) {
+  return (probes || []).map(p => ({ id: num(p.id), name: p.name || '', kind: num(p.kind), interval: num(p.interval),
+    points: (p.points || []).slice(-60).map(v => ({ ts: num(v.ts), state: num(v.state), us: num(v.us) })) }));
+}
+
 const SITE_DEFAULTS = { title: '节点状态', subtitle: '', showSpecs: true, showTraffic: true, offlineSec: 30, theme: 'default', options: {} };
 
 function normalizeLive(l, meta) {
@@ -204,6 +209,8 @@ export function createClient(options = {}) {
     const existing = state.byId.get(meta.id);
     const node = existing || { ...meta, live: normalizeLive({}, meta), hist: emptyHist() };
     Object.assign(node, meta);
+    if (n.probes) node.probes = normalizeProbes(n.probes);
+    else node.probes ||= [];
     if (n.live) node.live = normalizeLive(n.live, node);
     if (n.hist) {
       node.hist = { ts: [], cpu: (n.hist.cpu || []).map(num), mem: (n.hist.mem || []).map(num), rx: (n.hist.rx || []).map(num), tx: (n.hist.tx || []).map(num) };
@@ -260,6 +267,12 @@ export function createClient(options = {}) {
     c.on('snapshot', (s) => { applySnapshot(s); setConnection('connected'); });
     c.on('batch', applyBatch);
     c.on('nodes', applyNodes);
+    c.on('probes', report => {
+      const node = state.byId.get(num(report.id));
+      if (!node) return;
+      node.probes = normalizeProbes(report.probes);
+      emit('probes', state, node.id);
+    });
     c.onreconnecting((e) => setConnection('reconnecting', e || null));
     c.onreconnected(async () => {
       try { applySnapshot(await c.invoke('GetSnapshot')); } catch { /* the server also pushes a snapshot on connect */ }

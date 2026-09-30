@@ -5,7 +5,7 @@ using SNM.Master.Services;
 namespace SNM.Master.Runtime;
 
 /// <summary>Builds the browser-facing DTOs from NodeRuntime (docs/PROTOCOL.md 5-6). The public builder is a strict whitelist.</summary>
-public sealed class LiveSnapshotBuilder(NodeRegistry registry, SettingsService settings)
+public sealed class LiveSnapshotBuilder(NodeRegistry registry, SettingsService settings, ProbeService probes)
 {
     public static long UnixMs(DateTime utc) => new DateTimeOffset(utc, TimeSpan.Zero).ToUnixTimeMilliseconds();
 
@@ -75,6 +75,7 @@ public sealed class LiveSnapshotBuilder(NodeRegistry registry, SettingsService s
             TrafficLimitBytes = (ulong)Math.Max(meta.TrafficLimitBytes, 0),
             Live = PublicLive(n),
             Hist = withHistory ? PublicHistory(n) : null,
+            Probes = probes.Snapshot(n),
         };
     }
 

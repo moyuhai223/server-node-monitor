@@ -24,6 +24,8 @@ jobs:
           node-version: 22
       - name: Build web assets
         run: bash scripts/build-web.sh
+      - name: Test public probe SDK and theme statistics
+        run: node --test scripts/probes.test.mjs
       - name: Build solution
         run: dotnet build ServerNodeMonitor.slnx -c Release
       - name: Test

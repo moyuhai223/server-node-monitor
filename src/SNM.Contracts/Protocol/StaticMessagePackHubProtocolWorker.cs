@@ -35,6 +35,9 @@ internal sealed class StaticMessagePackHubProtocolWorker : MessagePackHubProtoco
 
     internal static object? Read(ref MessagePackReader reader, Type type)
     {
+        if (type == typeof(ProbeConfigDto)) return ProbeConfigDtoFormatter.Read(ref reader);
+        if (type == typeof(ProbeResultDto)) return ProbeResultDtoFormatter.Read(ref reader);
+        if (type == typeof(ProbeTargetDto)) return ProbeTargetDtoFormatter.Read(ref reader);
         if (type == typeof(AgentConfigDto)) return AgentConfigDtoFormatter.Read(ref reader);
         if (type == typeof(HeartbeatDto)) return HeartbeatDtoFormatter.Read(ref reader);
         if (type == typeof(RegisterDto)) return RegisterDtoFormatter.Read(ref reader);
@@ -59,6 +62,9 @@ internal sealed class StaticMessagePackHubProtocolWorker : MessagePackHubProtoco
     {
         switch (value)
         {
+            case ProbeConfigDto v: ProbeConfigDtoFormatter.Write(ref writer, v); break;
+            case ProbeResultDto v: ProbeResultDtoFormatter.Write(ref writer, v); break;
+            case ProbeTargetDto v: ProbeTargetDtoFormatter.Write(ref writer, v); break;
             case null: writer.WriteNil(); break;
             case HeartbeatDto v: HeartbeatDtoFormatter.Write(ref writer, v); break;
             case RegisterDto v: RegisterDtoFormatter.Write(ref writer, v); break;

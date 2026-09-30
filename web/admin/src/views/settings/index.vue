@@ -55,6 +55,9 @@
         <n-tab-pane name="themes" tab="大屏主题">
           <ThemesTab />
         </n-tab-pane>
+        <n-tab-pane name="probes" tab="延时探测">
+          <ProbesTab />
+        </n-tab-pane>
 
         <n-tab-pane name="channels" tab="通知渠道">
           <div class="mb-12 flex justify-end">
@@ -137,6 +140,7 @@
 </template>
 
 <script setup>
+import ProbesTab from './ProbesTab.vue'
 import { NButton, NSwitch, NTag } from 'naive-ui'
 import { CURRENCIES, RULE_NAMES, TIMEZONES } from '@/constants/snm'
 import { useAuthStore, useSystemStore } from '@/store'

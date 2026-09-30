@@ -111,6 +111,7 @@ public sealed class SettingsService(IDbContextFactory<SnmDbContext> dbFactory, I
 
     private static readonly IReadOnlyDictionary<string, Def> Defs = new Dictionary<string, Def>
     {
+        [ProbeService.SettingKey] = new("[]", Any, Secret: true, ReadOnly: true),
         ["site.title"] = new("\"Server Node Monitor\"", Str(1, 64)),
         ["site.publicTitle"] = new("\"节点状态\"", Str(1, 64)),
         ["site.publicSubtitle"] = new("\"\"", Str(0, 128)),

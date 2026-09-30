@@ -110,6 +110,8 @@ public sealed class NodeRuntime
 
     /// <summary>Guards hub-side mutations (register/hb/status may arrive on different connections).</summary>
     public readonly Lock Sync = new();
+    public readonly Dictionary<string, Queue<PublicProbePointDto>> ProbeSamples = new();
+    public bool ProbesDirty;
 
     public int Id => Meta.Id;
 

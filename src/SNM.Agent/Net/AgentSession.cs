@@ -71,7 +71,8 @@ internal sealed class AgentSession(CliOptions opts, SampleBuilder sampler)
                 using var loopCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 var hb = HeartbeatLoopAsync(conn, loopCts.Token);
                 var st = StatusLoopAsync(conn, loopCts.Token);
-                var finished = await Task.WhenAny(hb, st, closed.Task);
+                var probes = ProbeRunner.RunAsync(conn, loopCts.Token);
+                var finished = await Task.WhenAny(hb, st, probes, closed.Task);
                 loopCts.Cancel();
                 if (finished == closed.Task)
                 {
@@ -85,7 +86,7 @@ internal sealed class AgentSession(CliOptions opts, SampleBuilder sampler)
                     catch (Exception ex) { lastError = ex.Message; }
                     lastError ??= "loop ended";
                 }
-                try { await Task.WhenAll(hb, st).WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None); } catch { /* cancelled */ }
+                try { await Task.WhenAll(hb, st, probes).WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None); } catch { /* cancelled */ }
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {

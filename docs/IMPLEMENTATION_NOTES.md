@@ -1,5 +1,14 @@
 # 实现说明与设计差异(IMPLEMENTATION_NOTES)
 
+## Panorama 与延时探测（2026-09-30）
+
+- 新增独立 `panorama` 主题，复用原生主题 SDK；增加卡片/列表、搜索/状态筛选、深浅色、响应式布局和每线路延时曲线。
+- Agent 主动获取 ICMP/TCP 配置并独立上报测量；原心跳保持 9 字段。使用 AOT 静态 formatter，不执行远程命令或外部 ping 程序。
+- Master 将目标配置保存到现有 Settings 表，结果仅在内存保留最近 60 次；目标修订与节点归属校验、配置删除清理、公共字段脱敏已覆盖测试。
+- Windows 本机验证：183 项 .NET 测试、2 项 Node 测试通过，管理后台构建成功，新表单 ESLint 无警告；浏览器验证表单保存、搜索/空结果、视图切换、390px 深色布局，以及真实 Agent 的回环 ICMP、TCP 成功和关闭端口失败。
+- Native AOT：win-arm64 ILC 完成、未出现 IL 警告，最终链接因缺少可用 MSVC 链接器未完成。Linux ICMP 权限及各平台最终发行二进制仍需 CI/真实机器验证。
+- 使用、升级、统计语义及 Linux ICMP 能力配置见 [PROBES.md](PROBES.md)。本期不包含长期延时历史和延时告警。
+
 `docs/{DESIGN,PROTOCOL,API,DATA,DEPLOY,FRONTEND}.md` 是采纳的设计(候选方案 A)。实现过程中的差异与补充如下;以本文件与代码为准。
 
 ## 已验证的事实(2026-09-09,本机 Windows 11 ARM64 VM)

@@ -1,0 +1,10 @@
+{
+  "id": "panorama",
+  "name": "Panorama 全景",
+  "version": "1.0.0",
+  "author": "Server Node Monitor",
+  "description": "参考 Komari 的清爽总览、卡片与列表布局，支持实时性能、线路延时、深浅色与移动端。",
+  "entry": "index.html",
+  "preview": "preview.svg",
+  "sdk": 1
+}

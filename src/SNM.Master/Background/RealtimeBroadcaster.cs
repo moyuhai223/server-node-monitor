@@ -15,16 +15,18 @@ public sealed class RealtimeBroadcaster : SnmBackgroundService
     private readonly IHubContext<AdminHub> _adminHub;
     private readonly LiveSnapshotBuilder _builder;
     private readonly SettingsService _settings;
+    private readonly ProbeService _probes;
     private readonly ConcurrentQueue<int[]> _metaChanges = new();
     private volatile bool _siteChanged;
 
     public RealtimeBroadcaster(IHubContext<PublicHub> publicHub, IHubContext<AdminHub> adminHub, LiveSnapshotBuilder builder,
-        SettingsService settings, NodeRegistry registry, ILogger<RealtimeBroadcaster> logger) : base(logger, registry)
+        SettingsService settings, NodeRegistry registry, ProbeService probes, ILogger<RealtimeBroadcaster> logger) : base(logger, registry)
     {
         _publicHub = publicHub;
         _adminHub = adminHub;
         _builder = builder;
         _settings = settings;
+        _probes = probes;
         registry.NodesChanged += ids => _metaChanges.Enqueue(ids);
         settings.Changed += keys =>
         {
@@ -45,6 +47,13 @@ public sealed class RealtimeBroadcaster : SnmBackgroundService
 
         foreach (var node in Registry.All)
         {
+            bool probesDirty;
+            lock (node.Sync) { probesDirty = node.ProbesDirty; node.ProbesDirty = false; }
+            if (probesDirty)
+            {
+                var report = new PublicProbeBatchDto { Id = node.Id, Probes = _probes.Snapshot(node) };
+                if (_builder.IsPublicVisible(node)) await _publicHub.Clients.All.SendAsync("probes", report, ct);
+            }
             var meta = node.Meta;
             var timeout = meta.OfflineAlertSec ?? snap.OfflineTimeoutSec;
             if (node.Status == NodeStatus.Online && node.LastSeenAt is { } seen && (now - seen).TotalSeconds > timeout)

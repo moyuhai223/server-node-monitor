@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>全景监控</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a href="#" class="brand"
+          ><span class="brand-mark" aria-hidden="true">▥</span
+          ><span id="site-title">Server Node Monitor</span></a
+        >
+        <div class="top-actions">
+          <span class="connection"
+            ><i id="connection-dot"></i
+            ><span id="connection-text">正在连接</span></span
+          ><button
+            id="theme-toggle"
+            class="icon-button"
+            aria-label="切换深浅色"
+            title="切换深浅色"
+          >
+            ◐
+          </button>
+        </div>
+      </div>
+    </header>
+    <main class="shell">
+      <section class="intro">
+        <div>
+          <div class="eyebrow">INFRASTRUCTURE OVERVIEW</div>
+          <h1>每个节点，尽在掌握<span class="title-dot">.</span></h1>
+          <p id="subtitle">实时性能与网络质量，一目了然。</p>
+        </div>
+        <div class="updated">
+          <span>本地时间</span><strong id="clock">--:--:--</strong>
+        </div>
+      </section>
+      <div id="banner" class="banner" role="status" hidden></div>
+      <section class="summary" aria-label="节点总览">
+        <article>
+          <div class="summary-label">
+            在线节点 <span class="tile-icon green">◉</span>
+          </div>
+          <div class="summary-value">
+            <b id="online">—</b><span>/ <span id="total">—</span></span>
+          </div>
+          <small id="health-text">等待节点数据</small>
+        </article>
+        <article>
+          <div class="summary-label">
+            覆盖地区 <span class="tile-icon blue">◎</span>
+          </div>
+          <div class="summary-value">
+            <b id="regions">—</b><span>个地区</span>
+          </div>
+          <small>已公开节点的地理分布</small>
+        </article>
+        <article>
+          <div class="summary-label">
+            实时下载 <span class="tile-icon blue">↓</span>
+          </div>
+          <div class="summary-value"><b id="download">—</b></div>
+          <small>所有在线节点合计</small>
+        </article>
+        <article>
+          <div class="summary-label">
+            实时上传 <span class="tile-icon purple">↑</span>
+          </div>
+          <div class="summary-value"><b id="upload">—</b></div>
+          <small>所有在线节点合计</small>
+        </article>
+      </section>
+      <section class="fleet">
+        <div class="section-heading">
+          <h2>节点概览 <span id="count" class="count">0</span></h2>
+          <span class="section-caption">实时同步 · 自动更新</span>
+        </div>
+        <div class="toolbar">
+          <div class="filters" role="group" aria-label="节点状态筛选">
+            <button data-filter="all" class="active" aria-pressed="true">
+              全部节点</button
+            ><button data-filter="online" aria-pressed="false">在线</button
+            ><button data-filter="offline" aria-pressed="false">
+              离线 / 等待
+            </button>
+          </div>
+          <div class="tools">
+            <label class="search"
+              ><span aria-hidden="true">⌕</span
+              ><input
+                id="search"
+                type="search"
+                placeholder="搜索节点或地区…"
+                aria-label="搜索节点或地区"
+            /></label>
+            <div class="view-toggle" role="group" aria-label="显示方式">
+              <button
+                data-view="grid"
+                class="active"
+                aria-pressed="true"
+                title="卡片视图"
+                aria-label="卡片视图"
+              >
+                ▦</button
+              ><button
+                data-view="list"
+                aria-pressed="false"
+                title="列表视图"
+                aria-label="列表视图"
+              >
+                ☰
+              </button>
+            </div>
+          </div>
+        </div>
+        <div id="nodes" class="nodes"></div>
+        <div id="empty" class="empty" role="status">
+          <span>◎</span>
+          <h3 id="empty-title">正在连接监控中心</h3>
+          <p id="empty-description">节点实时数据将在连接成功后显示。</p>
+        </div>
+      </section>
+      <footer>
+        <span><i class="footer-dot"></i> Powered by Server Node Monitor</span
+        ><span>Panorama · 实时基础设施监控</span>
+      </footer>
+    </main>
+    <script src="/vendor/signalr.min.js"></script>
+    <script src="/vendor/signalr-protocol-msgpack.min.js"></script>
+    <script type="module" src="theme.js"></script>
+  </body>
+</html>

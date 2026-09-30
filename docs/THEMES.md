@@ -139,6 +139,10 @@ hist = { ts[], cpu[], mem[], rx[], tx[] }   // 最近 60 点(在线时每 2 秒�
 
 ## 6. 版本与兼容
 
+### 延时探测扩展
+
+新版 SDK 在 `Node.probes` 提供最近 60 次线路结果，并触发 `probes(state, nodeId)` 事件。各线路字段为 `{ id, name, kind, interval, points: [{ts, state, us}] }`；协议、统计语义见 [PROBES.md](PROBES.md)。旧版 Agent 的节点可以没有测量结果，主题应显示未测量而不是 0ms。Panorama 主题提供完整的卡片/列表、深浅色和线路曲线参考实现。
+
 - SDK 版本由 `SDK_VERSION` / `/api/settings/themes` 的 `sdk` 字段给出;新增字段和事件不升版本,破坏性变更才升。
 - 主题清单的 `sdk` 大于 Master 支持的版本时拒绝安装。
 - 主题统一放在本仓库 `web/themes/` 维护;zip 上传通道保留给需要在不升级 Master 的情况下单独分发/覆盖主题的场景。
