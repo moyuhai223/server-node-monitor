@@ -1,6 +1,6 @@
 # Server Node Monitor
 
-企业级服务器节点监控平台:**.NET 10 Native AOT 探针** + **ASP.NET Core Master(SignalR + MessagePack + EF Core SQLite WAL)** + **vue-naive-admin 管理后台** + **纯静态实时大屏**。需求见 [docs/PRD.md](docs/PRD.md),设计契约见 `docs/{DESIGN,PROTOCOL,API,DATA,DEPLOY,FRONTEND}.md`,实现差异见 [docs/IMPLEMENTATION_NOTES.md](docs/IMPLEMENTATION_NOTES.md)。发行包见 [Releases](https://github.com/moyuhai223/server-node-monitor/releases)(探针 linux-x64 / linux-arm64 / win-x64,Master linux-x64 / linux-arm64,容器镜像 `ghcr.io/moyuhai223/snm-master`)。
+企业级服务器节点监控平台:**.NET 10 Native AOT 探针** + **ASP.NET Core Master(SignalR + MessagePack + EF Core SQLite WAL)** + **vue-naive-admin 管理后台** + **纯静态实时大屏**。需求见 [docs/PRD.md](docs/PRD.md),设计契约见 `docs/{DESIGN,PROTOCOL,API,DATA,DEPLOY,FRONTEND}.md`,实现差异见 [docs/IMPLEMENTATION_NOTES.md](docs/IMPLEMENTATION_NOTES.md)。发行包见 [Releases](https://github.com/moyuhai223/server-node-monitor/releases)(探针 linux-x64 / linux-arm64 / win-x64 / win-arm64,Master linux-x64 / linux-arm64,容器镜像 `ghcr.io/moyuhai223/snm-master`)。
 
 ## 一键安装
 
@@ -26,7 +26,7 @@ curl -fsSL https://raw.githubusercontent.com/moyuhai223/server-node-monitor/main
 curl -fsSL https://raw.githubusercontent.com/moyuhai223/server-node-monitor/main/deploy/install-agent.sh | bash -s -- --server https://m.example.com --key snmk_xxxxxxxx
 ```
 
-Windows x64(管理员 PowerShell):
+Windows x64 / ARM64(管理员 PowerShell，安装脚本自动识别操作系统架构；ARM64 需要使用包含 `snm-agent-win-arm64.zip` 的新版 Release):
 
 ```powershell
 $env:SNM_SERVER = 'https://m.example.com'; $env:SNM_KEY = 'snmk_xxxxxxxx'; irm https://raw.githubusercontent.com/moyuhai223/server-node-monitor/main/deploy/install-agent.ps1 | iex
@@ -40,14 +40,14 @@ $env:SNM_SERVER = 'https://m.example.com'; $env:SNM_KEY = 'snmk_xxxxxxxx'; irm h
 
 ```
 src/SNM.Contracts   MessagePack DTO、Hub 常量、AOT 安全的 MessagePack Hub 协议(vendored MIT 代码 + 静态 formatter)
-src/SNM.Agent       探针(Native AOT,Linux x64/arm64 + Windows x64;只读、不监听、无远程执行、无自更新)
+src/SNM.Agent       探针(Native AOT,Linux x64/arm64 + Windows x64/arm64;只读、不监听、无远程执行、无自更新)
 src/SNM.Master      Master(REST API、三个 SignalR Hub、时序降采样、流量 Delta 计费、告警、Telegram/Webhook、安装脚本)
 web/admin           管理后台(vue-naive-admin 2.x 改造,Vite 8 / Vue 3.5 / Naive UI / ECharts)
 web/sdk             大屏主题 SDK(snm-client.js:连接/状态/历史/格式化,构建后位于 /vendor)
 web/themes/<id>     公开大屏主题(内置 default、minimal;纯 HTML/CSS/JS,可打包上传替换,见 docs/THEMES.md)
 tests/              xunit:契约字节等价、探针解析器、Master 集成(WebApplicationFactory + 真实 Hub 往返)
 deploy/             install-master.sh、install-agent.sh/.ps1(同时是 Master 渲染的模板)、systemd、Nginx、Docker
-.github/workflows   agent-aot(三平台 Native AOT)、master-build(测试 + 发行包 + 多架构镜像)
+.github/workflows   agent-aot(四平台 Native AOT)、master-build(测试 + 发行包 + 多架构镜像)
 scripts/            env.sh / dev.sh / build-web.sh / e2e.sh / ilc-check.sh
 ```
 

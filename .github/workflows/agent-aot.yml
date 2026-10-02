@@ -4,9 +4,9 @@ on:
   push:
     branches: [ main ]
     tags: [ 'v*' ]
-    paths: [ 'src/SNM.Agent/**', 'src/SNM.Contracts/**', 'Directory.*.props', 'global.json', '.github/workflows/agent-aot.yml' ]
+    paths: [ 'src/SNM.Agent/**', 'src/SNM.Contracts/**', 'deploy/install-agent.ps1', 'scripts/test-agent-windows.ps1', 'Directory.*.props', 'global.json', '.github/workflows/agent-aot.yml' ]
   pull_request:
-    paths: [ 'src/SNM.Agent/**', 'src/SNM.Contracts/**', 'Directory.*.props', 'global.json' ]
+    paths: [ 'src/SNM.Agent/**', 'src/SNM.Contracts/**', 'deploy/install-agent.ps1', 'scripts/test-agent-windows.ps1', 'Directory.*.props', 'global.json', '.github/workflows/agent-aot.yml' ]
   workflow_dispatch:
 
 permissions:
@@ -22,6 +22,7 @@ jobs:
           - { os: ubuntu-22.04,     rid: linux-x64,   ext: tar.gz }
           - { os: ubuntu-22.04-arm, rid: linux-arm64, ext: tar.gz }
           - { os: windows-2022,     rid: win-x64,     ext: zip }
+          - { os: windows-11-arm,   rid: win-arm64,   ext: zip }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -49,7 +50,13 @@ jobs:
             2>&1 | tee publish.log
           if grep -E 'warning IL[0-9]{4}' publish.log; then echo '::error::IL trim/AOT warnings found'; exit 1; fi
 
+      - name: Windows startup smoke test
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/test-agent-windows.ps1 -ExePath out/${{ matrix.rid }}/snm-agent.exe -ExpectedArchitecture ${{ matrix.rid }}
+
       - name: Smoke test
+        if: runner.os == 'Linux'
         shell: bash
         run: |
           BIN=$(ls out/${{ matrix.rid }}/snm-agent* | grep -vE '\.(pdb|dbg)$' | head -1)

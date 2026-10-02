@@ -1,4 +1,4 @@
-# Server Node Monitor - agent installer for Windows x64 (run in an elevated PowerShell).
+# Server Node Monitor - agent installer for Windows x64/ARM64 (run in an elevated PowerShell).
 #
 # Standalone (values from environment variables):
 #   $env:SNM_SERVER = 'https://m.example.com'; $env:SNM_KEY = 'snmk_xxxxxxxx'
@@ -50,9 +50,22 @@ if ($SnmServer -notmatch '^https?://') { Die 'SNM_SERVER must be an http(s) orig
 if (-not $SnmKey) { Die 'SNM_KEY is required (create a node in the admin UI to get its snmk_... key)' }
 if ($SnmKey -notmatch '^snmk_[A-Za-z0-9_-]{43}$') { Die 'SNM_KEY has an unexpected format (expected snmk_ + 43 characters)' }
 
-$arch = $env:PROCESSOR_ARCHITECTURE
-if ($arch -ne 'AMD64') { Die "unsupported architecture: $arch (only win-x64 builds are published)" }
-$asset = 'snm-agent-win-x64.zip'
+function Get-SnmWindowsRid {
+  # OS architecture is required: PowerShell itself may be running under emulation.
+  try { $arch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString() }
+  catch {
+    $arch = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
+  }
+  switch ($arch) {
+    'X64'   { return 'win-x64' }
+    'AMD64' { return 'win-x64' }
+    'Arm64' { return 'win-arm64' }
+    default { throw "unsupported Windows architecture: $arch (supported: x64, ARM64)" }
+  }
+}
+$rid = Get-SnmWindowsRid
+$asset = "snm-agent-$rid.zip"
+Log "detected $rid"
 $base = if ($Version) { if ($Version -notmatch '^v') { $Version = "v$Version" }; ($ReleaseBase -replace '/latest/download$', '') + "/download/$Version" } else { $ReleaseBase }
 $tmp = Join-Path $env:TEMP ('snm-agent-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $tmp | Out-Null
@@ -75,6 +88,7 @@ try {
   New-Item -ItemType Directory -Force -Path $InstallDir, $DataDir | Out-Null
   Copy-Item -Force $newExe.FullName $Exe
   $ver = & $Exe --version 2>$null
+  if ($LASTEXITCODE -ne 0 -or -not $ver) { Die "installed binary failed to start (exit code $LASTEXITCODE)" }
   Log "installed binary $ver"
 
   $lines = @("SNM_SERVER=$SnmServer", "SNM_KEY=$SnmKey", 'SNM_LOG_LEVEL=info')
