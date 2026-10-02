@@ -268,6 +268,10 @@ public sealed class NotificationDispatcher(IDbContextFactory<SnmDbContext> dbFac
         {
             Content = new StringContent(body, Encoding.UTF8, cfg.ContentType),
         };
+        // VoceChat requires the exact text media type without charset parameters.
+        // StringContent has already encoded the payload as UTF-8.
+        if (cfg.ContentType is "text/plain" or "text/markdown")
+            req.Content.Headers.ContentType = new MediaTypeHeaderValue(cfg.ContentType);
         var ts = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
         req.Headers.UserAgent.Add(new ProductInfoHeaderValue("snm-master", typeof(NotificationDispatcher).Assembly.GetName().Version?.ToString(3) ?? "1.0"));
         req.Headers.TryAddWithoutValidation("X-SNM-Event", eventName);

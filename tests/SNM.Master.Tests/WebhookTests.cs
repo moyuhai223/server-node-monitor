@@ -46,7 +46,7 @@ public class WebhookTests(MasterFactory factory) : IClassFixture<MasterFactory>
         }, ev, null, CancellationToken.None);
         Assert.True(result.Ok, result.Error);
         Assert.Equal(contentType ?? "application/json", capture.ContentType);
-        Assert.Equal("utf-8", capture.Charset);
+        Assert.Equal(contentType is "text/plain" or "text/markdown" ? "" : "utf-8", capture.Charset);
         Assert.Equal("fake-api-key", capture.ApiKey);
         var expectedSignature = Convert.ToHexStringLower(HMACSHA256.HashData(Encoding.UTF8.GetBytes("test-signing-key"), Encoding.UTF8.GetBytes(capture.Timestamp + "." + capture.Body)));
         Assert.Equal("sha256=" + expectedSignature, capture.Signature);
@@ -139,7 +139,9 @@ public class WebhookTests(MasterFactory factory) : IClassFixture<MasterFactory>
         {
             Body = await request.Content!.ReadAsStringAsync(cancellationToken);
             ContentType = request.Content.Headers.ContentType!.MediaType!;
-            Charset = request.Content.Headers.ContentType.CharSet!;
+            Charset = request.Content.Headers.ContentType.CharSet ?? "";
+            if (ContentType is "text/plain" or "text/markdown" && request.Content.Headers.ContentType.ToString() != ContentType)
+                return new HttpResponseMessage(HttpStatusCode.UnsupportedMediaType) { Content = new StringContent("Text content type must not include parameters") };
             ApiKey = request.Headers.GetValues("x-api-key").Single();
             Timestamp = request.Headers.GetValues("X-SNM-Timestamp").Single();
             Signature = request.Headers.GetValues("X-SNM-Signature").Single();
