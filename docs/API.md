@@ -374,7 +374,11 @@
 
 校验:`type ∈ {telegram, webhook}`;`name` 1–64;telegram `botToken` 匹配 `^\d+:[A-Za-z0-9_-]{30,}$`,`chatId` 非空;webhook `url` http(s),`method ∈ {POST, PUT}`,`timeoutSec` 3–60,`headers` ≤ 10 项且键不得为 `Content-Type/Authorization` 之外的敏感头覆盖(允许 `Authorization`);`ruleMask` 0–126;`minSeverity` 1–3。
 
-`POST /api/settings/channels/{id}/test` 与 `POST /api/settings/channels/test`(请求体为未保存的渠道对象)→
+Webhook `config.contentType` 支持 `application/json`（缺省值，兼容旧配置）、`text/plain`、`text/markdown`，均使用 UTF-8。通过该字段设置正文类型，自定义请求头中不允许设置 `Content-Type`。JSON 模板占位符按 JSON 转义；纯文本和 Markdown 占位符保留原始字符与换行。模板留空时，JSON 发送默认事件对象，纯文本和 Markdown 发送完整告警文本。
+
+VoceChat 示例：URL 填 `/api/bot/send_to_user/用户ID` 对应的完整地址，方法为 `POST`，在自定义请求头中添加 `x-api-key`，签名密钥留空。正文类型选 `text/plain`，模板填 `{{text}}`；或选 `text/markdown`，模板使用 `**{{title}}**` 后换行再写 `{{message}}`。API Key 不写入正文模板。
+
+`POST /api/settings/channels/{id}/test` 与 `POST /api/settings/channels/test`(请求体为未保存的渠道对象；可附加已有渠道 `id`，合并保存的密钥与当前表单配置进行测试，不保存修改，也不更新正式渠道的投递状态)→
 
 ```json
 { "code": 0, "data": { "ok": true, "statusCode": 200, "elapsedMs": 412, "response": "{\"ok\":true,...}" } }

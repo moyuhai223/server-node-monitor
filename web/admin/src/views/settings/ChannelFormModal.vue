@@ -54,8 +54,11 @@
         <n-form-item label="自定义请求头">
           <n-dynamic-input v-model:value="form.headerList" :max="10" preset="pair" key-placeholder="Header" value-placeholder="值" />
         </n-form-item>
+        <n-form-item label="正文类型">
+          <n-select v-model:value="form.config.contentType" :options="bodyTypes" />
+        </n-form-item>
         <n-form-item label="正文模板">
-          <n-input v-model:value="form.config.bodyTemplate" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" placeholder="留空使用默认 JSON。占位符：{{event}} {{title}} {{message}} {{text}} {{severity}} {{rule}} {{node.name}} {{node.remark}} {{startedAt}} {{site.url}}" />
+          <n-input v-model:value="form.config.bodyTemplate" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :placeholder="bodyPlaceholder" />
         </n-form-item>
       </template>
     </n-form>
@@ -83,18 +86,24 @@ const isEdit = ref(false)
 const editId = ref(null)
 const testing = ref(false)
 const required = { required: true, message: '此为必填项', trigger: ['blur', 'input'] }
+const bodyTypes = [
+  { value: 'application/json', label: 'JSON (application/json)' },
+  { value: 'text/plain', label: '纯文本 (text/plain)' },
+  { value: 'text/markdown', label: 'Markdown (text/markdown)' },
+]
 
 function blank() {
-  return { type: 'telegram', name: '', enabled: true, rules: [], minSeverity: 1, headerList: [], config: { botToken: '', chatId: '', parseMode: 'HTML', disableNotification: false, url: '', method: 'POST', secret: '', timeoutSec: 10, bodyTemplate: '' } }
+  return { type: 'telegram', name: '', enabled: true, rules: [], minSeverity: 1, headerList: [], config: { botToken: '', chatId: '', parseMode: 'HTML', disableNotification: false, url: '', method: 'POST', secret: '', timeoutSec: 10, contentType: 'application/json', bodyTemplate: '' } }
 }
 const form = ref(blank())
+const bodyPlaceholder = computed(() => `${form.value.config.contentType === 'application/json' ? '留空使用默认 JSON。' : '留空发送完整告警文本，支持直接换行。'}占位符：{{title}} {{message}} {{text}} {{node.name}} {{site.url}}`)
 
 function toPayload() {
   const f = form.value
   const ruleMask = f.rules.reduce((m, r) => m | (1 << r), 0)
   const config = f.type === 'telegram'
     ? { botToken: f.config.botToken || undefined, chatId: f.config.chatId, parseMode: f.config.parseMode, disableNotification: f.config.disableNotification }
-    : { url: f.config.url, method: f.config.method, secret: f.config.secret || undefined, timeoutSec: f.config.timeoutSec, bodyTemplate: f.config.bodyTemplate || null, headers: Object.fromEntries(f.headerList.filter(h => h.key).map(h => [h.key, h.value])) }
+    : { url: f.config.url, method: f.config.method, secret: f.config.secret || undefined, timeoutSec: f.config.timeoutSec, contentType: f.config.contentType, bodyTemplate: f.config.bodyTemplate || null, headers: Object.fromEntries(f.headerList.filter(h => h.key).map(h => [h.key, h.value])) }
   if (config.botToken === '****' || config.botToken === '')
     delete config.botToken
   if (config.secret === '****' || config.secret === '')
@@ -117,9 +126,10 @@ async function test() {
   try {
     await formRef.value?.validate()
     testing.value = true
-    const { data } = isEdit.value && !form.value.config.botToken && !form.value.config.secret
-      ? await api.testChannel(editId.value)
-      : await api.testChannelDraft(toPayload())
+    const payload = toPayload()
+    if (isEdit.value)
+      payload.id = editId.value
+    const { data } = await api.testChannelDraft(payload)
     $message.success(`测试消息已发送 (${data.statusCode}, ${data.elapsedMs} ms)`)
   }
   catch (e) {

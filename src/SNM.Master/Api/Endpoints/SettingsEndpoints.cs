@@ -83,10 +83,20 @@ public static class SettingsEndpoints
             return TestResult(await dispatcher.TestAsync(ch, ct));
         });
 
-        g.MapPost("/channels/test", async (JsonElement body, NotificationDispatcher dispatcher, CancellationToken ct) =>
+        g.MapPost("/channels/test", async (JsonElement body, IDbContextFactory<SnmDbContext> dbFactory, NotificationDispatcher dispatcher, CancellationToken ct) =>
         {
             var ch = new NotificationChannel();
-            Apply(ch, body, isCreate: true);
+            var editing = false;
+            if (body.ValueKind == JsonValueKind.Object && body.TryGetProperty("id", out var idValue))
+            {
+                if (idValue.ValueKind != JsonValueKind.Number || !idValue.TryGetInt32(out var id) || id <= 0) throw ApiException.BadRequest("渠道 ID 无效");
+                await using var db = await dbFactory.CreateDbContextAsync(ct);
+                ch = await db.NotificationChannels.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id, ct) ?? throw ApiException.NotFound("渠道不存在");
+                editing = true;
+            }
+            Apply(ch, body, isCreate: !editing);
+            // A draft may reuse stored secrets, but must not change the saved channel or its delivery status.
+            ch.Id = 0;
             return TestResult(await dispatcher.TestAsync(ch, ct));
         });
 
@@ -241,6 +251,13 @@ public static class SettingsEndpoints
 
     private static void ApplyWebhook(JsonObject cfg, JsonElement input, Validator v)
     {
+        if (input.TryGetProperty("contentType", out var contentType))
+        {
+            var value = contentType.ValueKind == JsonValueKind.String ? contentType.GetString()!.Trim().ToLowerInvariant() : "";
+            if (value is "application/json" or "text/plain" or "text/markdown") cfg["contentType"] = value;
+            else v.Add("config.contentType", "须为 application/json / text/plain / text/markdown");
+        }
+        cfg["contentType"] ??= "application/json";
         if (input.TryGetProperty("url", out var url) && url.ValueKind == JsonValueKind.String) cfg["url"] = url.GetString()!.Trim();
         if (input.TryGetProperty("method", out var m) && m.ValueKind == JsonValueKind.String)
         {

@@ -24,6 +24,7 @@ public sealed class TelegramConfig
 
 public sealed class WebhookConfig
 {
+    public string ContentType { get; set; } = "application/json";
     public string Url { get; set; } = "";
     public string Method { get; set; } = "POST";
     public string? Secret { get; set; }
@@ -213,6 +214,8 @@ public sealed class NotificationDispatcher(IDbContextFactory<SnmDbContext> dbFac
     private async Task<DeliveryResult> SendWebhookAsync(NotificationChannel channel, AlertEvent ev, Node? node, Stopwatch sw, CancellationToken ct)
     {
         var cfg = JsonSerializer.Deserialize<WebhookConfig>(channel.ConfigJson, JsonOpts) ?? new WebhookConfig();
+        if (cfg.ContentType is not ("application/json" or "text/plain" or "text/markdown"))
+            return new DeliveryResult(false, 0, "Webhook 正文类型无效", 0, null);
         if (!Uri.TryCreate(cfg.Url, UriKind.Absolute, out var uri) || (uri.Scheme != "http" && uri.Scheme != "https"))
             return new DeliveryResult(false, 0, "Webhook URL 无效", 0, null);
 
@@ -233,7 +236,11 @@ public sealed class NotificationDispatcher(IDbContextFactory<SnmDbContext> dbFac
                 ["node.countryCode"] = node?.CountryCodeOverride ?? node?.CountryCodeAuto ?? "",
                 ["startedAt"] = ev.StartedAt.ToString("O"), ["resolvedAt"] = ev.ResolvedAt?.ToString("O"),
                 ["site.title"] = s.SiteTitle, ["site.url"] = siteUrl,
-            });
+            }, jsonEscape: cfg.ContentType == "application/json");
+        }
+        else if (cfg.ContentType != "application/json")
+        {
+            body = text;
         }
         else
         {
@@ -259,7 +266,7 @@ public sealed class NotificationDispatcher(IDbContextFactory<SnmDbContext> dbFac
         var http = httpFactory.CreateClient("notify");
         using var req = new HttpRequestMessage(string.Equals(cfg.Method, "PUT", StringComparison.OrdinalIgnoreCase) ? HttpMethod.Put : HttpMethod.Post, uri)
         {
-            Content = new StringContent(body, Encoding.UTF8, "application/json"),
+            Content = new StringContent(body, Encoding.UTF8, cfg.ContentType),
         };
         var ts = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
         req.Headers.UserAgent.Add(new ProductInfoHeaderValue("snm-master", typeof(NotificationDispatcher).Assembly.GetName().Version?.ToString(3) ?? "1.0"));
@@ -287,8 +294,8 @@ public sealed class NotificationDispatcher(IDbContextFactory<SnmDbContext> dbFac
         return new DeliveryResult(ok, (int)resp.StatusCode, ok ? null : $"HTTP {(int)resp.StatusCode}: {Truncate(respBody)}", (int)sw.ElapsedMilliseconds, Truncate(respBody));
     }
 
-    /// <summary>{{placeholder}} substitution; values are JSON-escaped without surrounding quotes.</summary>
-    public static string RenderTemplate(string template, IReadOnlyDictionary<string, string?> values)
+    /// <summary>{{placeholder}} substitution; JSON values are escaped, text/Markdown values are preserved.</summary>
+    public static string RenderTemplate(string template, IReadOnlyDictionary<string, string?> values, bool jsonEscape = true)
     {
         var sb = new StringBuilder(template.Length + 64);
         var i = 0;
@@ -302,8 +309,12 @@ public sealed class NotificationDispatcher(IDbContextFactory<SnmDbContext> dbFac
             var key = template[(start + 2)..end].Trim();
             if (values.TryGetValue(key, out var v))
             {
-                var escaped = JsonSerializer.Serialize(v ?? "");
-                sb.Append(escaped, 1, escaped.Length - 2);
+                if (jsonEscape)
+                {
+                    var escaped = JsonSerializer.Serialize(v ?? "");
+                    sb.Append(escaped, 1, escaped.Length - 2);
+                }
+                else sb.Append(v);
             }
             i = end + 2;
         }
