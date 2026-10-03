@@ -236,6 +236,36 @@ small {
 .fleet {
   margin-top: 34px;
 }
+.region-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 14px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 3px;
+  margin-left: -3px;
+}
+.region-tag {
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--muted);
+  padding: 7px 9px;
+  font-size: 11px;
+  line-height: 1.4;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.region-tag:hover,
+.region-tag.active {
+  color: var(--accent);
+  background: var(--soft);
+  border-color: var(--accent);
+}
+.region-tag.active {
+  font-weight: 600;
+}
 .section-heading {
   display: flex;
   align-items: center;

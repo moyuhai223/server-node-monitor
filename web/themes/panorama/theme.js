@@ -4,7 +4,9 @@ import { probeStats } from "./probes.js";
 const $ = (id) => document.getElementById(id);
 const client = createClient({ theme: "panorama" });
 const cards = new Map();
+const regionButtons = new Map();
 let filter = "all",
+  region = "all",
   query = "",
   received = false,
   scheduled = false;
@@ -133,6 +135,7 @@ function renderProbes(el, node) {
 
 function visible(node) {
   return (
+    (region === "all" || regionCode(node) === region) &&
     (filter === "all" ||
       (filter === "online" ? node.live.online : !node.live.online)) &&
     `${node.name} ${node.cc} ${fmt.country(node.cc)}`
@@ -149,6 +152,10 @@ function layout() {
       fragment.append(el);
     }
   $("nodes").replaceChildren(fragment);
+  const visibleCount = $("nodes").childElementCount;
+  $("count").textContent = region !== "all" || filter !== "all" || query
+    ? `${visibleCount} / ${nodes.length}`
+    : nodes.length;
   for (const id of cards.keys())
     if (!client.state.byId.has(id)) cards.delete(id);
   $("empty").hidden = $("nodes").childElementCount > 0;
@@ -164,15 +171,59 @@ function layout() {
     : "节点实时数据将在连接成功后显示。";
   draw();
 }
+function regionCode(node) {
+  return (node.cc || "").trim().toUpperCase();
+}
+function renderRegionFilters(nodes) {
+  const counts = new Map();
+  for (const node of nodes) {
+    const code = regionCode(node);
+    counts.set(code, (counts.get(code) || 0) + 1);
+  }
+  if (region !== "all" && !counts.has(region)) region = "all";
+  const codes = [...counts.keys()].sort((a, b) => {
+    if (!a) return 1;
+    if (!b) return -1;
+    return fmt.country(a).localeCompare(fmt.country(b), "zh-CN");
+  });
+  const entries = [["all", nodes.length], ...codes.map((code) => [code, counts.get(code)])];
+  const group = $("region-filters");
+  group.hidden = nodes.length === 0;
+  for (const [code, button] of regionButtons) {
+    if (code !== "all" && !counts.has(code)) {
+      button.remove();
+      regionButtons.delete(code);
+    }
+  }
+  entries.forEach(([code, count], index) => {
+    let button = regionButtons.get(code);
+    if (!button) {
+      button = document.createElement("button");
+      button.type = "button";
+      button.className = "region-tag";
+      button.onclick = () => {
+        region = region === code ? "all" : code;
+        renderRegionFilters(client.state.nodes);
+        layout();
+      };
+      regionButtons.set(code, button);
+    }
+    const name = code === "all" ? "全部" : code ? fmt.country(code) || code : "地区待识别";
+    button.textContent = `${name} ${count}`;
+    button.setAttribute("aria-label", `${name}，${count} 个节点`);
+    button.setAttribute("aria-pressed", String(region === code));
+    button.classList.toggle("active", region === code);
+    // Reuse buttons on heartbeats so keyboard focus is not lost.
+    if (group.children[index] !== button) group.insertBefore(button, group.children[index] || null);
+  });
+  $("regions").textContent = codes.filter(Boolean).length;
+}
 function summary() {
   const nodes = client.state.nodes,
     online = nodes.filter((n) => n.live.online);
   $("online").textContent = online.length;
   $("total").textContent = nodes.length;
-  $("count").textContent = nodes.length;
-  $("regions").textContent = new Set(
-    nodes.map((n) => n.cc).filter(Boolean),
-  ).size;
+  renderRegionFilters(nodes);
   $("download").textContent = fmt.bps(
     online.reduce((sum, n) => sum + n.live.rx, 0),
   );
