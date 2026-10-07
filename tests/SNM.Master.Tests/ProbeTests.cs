@@ -18,6 +18,52 @@ namespace SNM.Master.Tests;
 public class ProbeTests(MasterFactory factory) : IClassFixture<MasterFactory>
 {
     [Fact]
+    public async Task All_nodes_mode_includes_future_nodes_and_preserves_existing_windows()
+    {
+        using var admin = await factory.LoginAsync();
+        var target = new ProbeTarget { Id = 10, Name = "全部节点线路", Address = "example.com", AllNodes = true };
+        // No explicit node IDs are needed, even when configuring targets before nodes exist.
+        (await admin.PutAsJsonAsync("/api/settings/probes", new[] { target })).EnsureSuccessStatusCode();
+        var probes = factory.Services.GetRequiredService<ProbeService>();
+        var registry = factory.Services.GetRequiredService<NodeRegistry>();
+        var revision = Assert.Single(probes.Targets).Revision;
+        var created = await MasterFactory.DataAsync(await admin.PostAsJsonAsync("/api/nodes", new { publicName = "Later node" }));
+        var node = registry.Get(created.GetProperty("id").GetInt32())!;
+        Assert.Equal(revision, Assert.Single(probes.Configuration(node).Targets).Revision);
+        Assert.Single(probes.Snapshot(node));
+        node.Registered = true;
+        node.Connected = true;
+        node.ConnectionId = "all-nodes-test";
+        var result = new ProbeResultDto { Id = target.Id, Revision = revision, Microseconds = 1000 };
+        Assert.True(probes.Accept(node, node.ConnectionId, result, DateTime.UtcNow));
+
+        var later = await MasterFactory.DataAsync(await admin.PostAsJsonAsync("/api/nodes", new { publicName = "Another later node" }));
+        Assert.Single(probes.Configuration(registry.Get(later.GetProperty("id").GetInt32())!).Targets);
+        // Saving the same all-node definition does not depend on the current node inventory.
+        (await admin.PutAsJsonAsync("/api/settings/probes", new[] { target with { NodeIds = [int.MaxValue] } })).EnsureSuccessStatusCode();
+        Assert.Equal(revision, Assert.Single(probes.Targets).Revision);
+        Assert.Empty(Assert.Single(probes.Targets).NodeIds);
+        Assert.Single(Assert.Single(probes.Snapshot(node)).Points);
+        var reloaded = new ProbeService(factory.Services.GetRequiredService<SettingsService>(), registry);
+        Assert.True(Assert.Single(reloaded.Targets).AllNodes);
+        Assert.Single(reloaded.Configuration(node).Targets);
+
+        node.Meta.Enabled = false;
+        Assert.Empty(probes.Configuration(node).Targets);
+        Assert.Empty(probes.Snapshot(node));
+        Assert.False(probes.Accept(node, node.ConnectionId, result, DateTime.UtcNow.AddMinutes(1)));
+        node.Meta.Enabled = true;
+        (await admin.PutAsJsonAsync("/api/settings/probes", new[] { target with { AllNodes = false, NodeIds = [node.Id] } })).EnsureSuccessStatusCode();
+        Assert.NotEqual(revision, Assert.Single(probes.Targets).Revision);
+        Assert.Empty(node.ProbeSamples);
+        Assert.Empty(probes.Configuration(registry.Get(later.GetProperty("id").GetInt32())!).Targets);
+        Assert.False(probes.Accept(node, node.ConnectionId, result, DateTime.UtcNow.AddMinutes(1)));
+        (await admin.PutAsJsonAsync("/api/settings/probes", new[] { target with { Enabled = false } })).EnsureSuccessStatusCode();
+        Assert.Empty(probes.Configuration(node).Targets);
+        Assert.Empty(probes.Snapshot(node));
+    }
+
+    [Fact]
     public async Task Real_agent_hub_round_trip_privacy_revision_and_bounded_history()
     {
         using var anonymous = factory.CreateClient();

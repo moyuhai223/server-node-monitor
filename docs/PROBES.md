@@ -3,7 +3,7 @@
 ## 使用
 
 1. 更新 Master、Web SDK 与需要探测的 Agent。现有性能协议不变，旧 Agent 可继续监控，但不会执行探测。
-2. 后台 **系统设置 → 延时探测 → 新增目标**，填写公开线路名称、目标 IP/域名、ICMP/TCP、TCP 端口、间隔、超时及参与节点，保存。
+2. 后台 **系统设置 → 延时探测 → 新增目标**，填写公开线路名称、目标 IP/域名、ICMP/TCP、TCP 端口、间隔及超时，保存。所有已启用节点自动参与，后续新增节点也自动加入，无需手动选择。旧目标保留原分配，打开此页面并保存后会统一切换为全部节点。
 3. 后台 **系统设置 → 大屏主题 → Panorama 全景 → 启用**。主题也可在 `/themes/panorama/` 预览。
 
 目标必须由管理员选择实际需要测量的地址。没有内置运营商地址，避免把任意公共 DNS 的网络路径标成某个运营商。支持 IPv4、IPv6、域名；域名优先使用解析到的 IPv4，想固定 IPv6 可直接填 IPv6 地址。
@@ -32,7 +32,7 @@ AmbientCapabilities=CAP_NET_RAW
 ## 协议与管理接口
 
 - `GET /api/settings/probes`：管理员获取私有目标、节点及当前结果。
-- `PUT /api/settings/probes`：管理员整体保存目标数组；最多 16 个，每个目标选择 1–512 个节点，间隔 10–3600 秒，超时 200–10000 ms。
+- `PUT /api/settings/probes`：管理员整体保存目标数组；最多 16 个，间隔 10–3600 秒，超时 200–10000 ms。界面保存 `allNodes: true`、`nodeIds: []`，动态覆盖所有已启用节点，无需维护节点 ID 列表。旧客户端仍可使用 `allNodes: false`（缺省值）和 1–512 个有效且不重复的 `nodeIds`。仅改变节点数量不会重置已有探测结果。
 - Agent `getProbes`：注册后获取仅分配给本节点的 `ProbeConfigDto`；Agent `probe`：独立上报 `ProbeResultDto`。数组型 DTO 使用 AOT 静态 formatter，与现有 9 字段心跳分离。
 - 配置含服务端生成的修订标识；目标修改后旧结果被拒绝。结果校验节点归属、当前注册连接、修订、数值范围和上报频率。
 - Public Hub `probes`：`{id, probes:[{id,name,kind,interval,points:[{ts,state,us}]}]}`。SDK 提供 `node.probes` 和 `probes(state,nodeId)` 事件，时间戳由服务端生成。

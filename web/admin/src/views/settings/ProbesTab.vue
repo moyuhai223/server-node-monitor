@@ -3,6 +3,7 @@
     <n-alert type="info" :show-icon="false">
       节点主动探测指定目标，配置约 30 秒内生效。ICMP 统计往返延时与丢包率，TCP 统计建连耗时与失败率。
       公开页面仅展示线路名称和结果。需要升级 Agent；ICMP 无权限时显示“不支持”，可改用 TCP。
+      保存后，所有已启用节点都会参与探测，新增节点自动加入，无需手动选择。
     </n-alert>
     <n-space justify="space-between">
       <span>探测目标 {{ targets.length }} / 16</span>
@@ -47,7 +48,9 @@
               <n-input-number v-model:value="target.timeoutMs" :min="200" :max="10000" :step="100" />
             </n-form-item-gi>
             <n-form-item-gi span="12" label="参与节点">
-              <n-select v-model:value="target.nodeIds" multiple filterable :options="nodeOptions" placeholder="选择需要测试该线路的节点" />
+              <n-tag type="info" :bordered="false">
+                全部已启用节点 · 新增节点自动加入
+              </n-tag>
             </n-form-item-gi>
           </n-grid>
         </n-form>
@@ -63,29 +66,26 @@
 import { request } from '@/utils'
 
 const targets = ref([])
-const nodes = ref([])
 const loading = ref(true)
 const saving = ref(false)
-const nodeOptions = computed(() => nodes.value.map(n => ({ label: n.name + (n.enabled ? '' : '（已禁用）'), value: n.id })))
 async function load() {
   loading.value = true
   try {
     const { data } = await request.get('/settings/probes')
-    targets.value = data.targets
-    nodes.value = data.nodes
+    targets.value = data.targets.map(t => ({ ...t, allNodes: true, nodeIds: [] }))
   }
   finally { loading.value = false }
 }
 function add() {
-  targets.value.push({ id: Math.max(0, ...targets.value.map(t => t.id)) + 1, name: '', address: '', kind: 1, port: 443, intervalSec: 30, timeoutMs: 2000, nodeIds: [], enabled: true })
+  targets.value.push({ id: Math.max(0, ...targets.value.map(t => t.id)) + 1, name: '', address: '', kind: 1, port: 443, intervalSec: 30, timeoutMs: 2000, allNodes: true, nodeIds: [], enabled: true })
 }
 async function save() {
-  if (targets.value.some(t => !t.name.trim() || !t.address.trim() || !t.nodeIds.length)) {
-    return $message.warning('请填写线路名称、目标地址并选择参与节点')
+  if (targets.value.some(t => !t.name.trim() || !t.address.trim())) {
+    return $message.warning('请填写线路名称和目标地址')
   }
   saving.value = true
   try {
-    const { data } = await request.put('/settings/probes', targets.value.map(t => ({ ...t, name: t.name.trim(), address: t.address.trim() })))
+    const { data } = await request.put('/settings/probes', targets.value.map(t => ({ ...t, name: t.name.trim(), address: t.address.trim(), allNodes: true, nodeIds: [] })))
     targets.value = data.targets
     $message.success('已保存，Agent 将在约 30 秒内应用')
   }

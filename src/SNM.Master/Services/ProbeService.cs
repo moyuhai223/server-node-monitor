@@ -16,6 +16,7 @@ public sealed record ProbeTarget
     public int IntervalSec { get; init; } = 30;
     public int TimeoutMs { get; init; } = 2000;
     public int[] NodeIds { get; init; } = [];
+    public bool AllNodes { get; init; }
     public bool Enabled { get; init; } = true;
     public string Revision { get; init; } = "";
 }
@@ -49,7 +50,7 @@ public sealed class ProbeService(SettingsService settings, NodeRegistry registry
                 throw ApiException.BadRequest("请输入 IP 或域名，不包含协议、路径或端口");
             if (t.Kind > 1 || t.Port is < 1 or > 65535 || t.IntervalSec is < 10 or > 3600 || t.TimeoutMs is < 200 or > 10000)
                 throw ApiException.BadRequest("协议、端口、间隔或超时超出范围");
-            if (t.NodeIds is null || t.NodeIds.Length is 0 or > 512 || t.NodeIds.Distinct().Count() != t.NodeIds.Length || t.NodeIds.Any(id => registry.Get(id) is null))
+            if (!t.AllNodes && (t.NodeIds is null || t.NodeIds.Length is 0 or > 512 || t.NodeIds.Distinct().Count() != t.NodeIds.Length || t.NodeIds.Any(id => registry.Get(id) is null)))
                 throw ApiException.BadRequest("请选择 1–512 个有效且不重复的节点");
         }
         await _save.WaitAsync(ct);
@@ -62,14 +63,15 @@ public sealed class ProbeService(SettingsService settings, NodeRegistry registry
                 // Reuse a window only if the measurement definition and assignment are unchanged.
                 var same = previous is not null && previous.Address == t.Address && previous.Kind == t.Kind
                     && previous.Port == t.Port && previous.IntervalSec == t.IntervalSec && previous.TimeoutMs == t.TimeoutMs
-                    && previous.Enabled == t.Enabled && previous.NodeIds.Order().SequenceEqual(t.NodeIds.Order());
-                return t with { Revision = same ? previous!.Revision : Guid.NewGuid().ToString("N"), Name = t.Name.Trim() };
+                    && previous.Enabled == t.Enabled && previous.AllNodes == t.AllNodes
+                    && (t.AllNodes || previous.NodeIds.Order().SequenceEqual(t.NodeIds.Order()));
+                return t with { Revision = same ? previous!.Revision : Guid.NewGuid().ToString("N"), Name = t.Name.Trim(), NodeIds = t.AllNodes ? [] : t.NodeIds };
             }).ToArray();
             await settings.SetInternalAsync(SettingKey, SettingsService.J(updated), ct);
             _targets = updated;
             foreach (var node in registry.All)
             {
-                var revisions = updated.Where(t => t.Enabled && t.NodeIds.Contains(node.Id)).Select(t => t.Revision).ToHashSet();
+                var revisions = updated.Where(t => t.Enabled && AppliesTo(t, node)).Select(t => t.Revision).ToHashSet();
                 lock (node.Sync)
                     foreach (var key in node.ProbeSamples.Keys.Where(k => !revisions.Contains(k)).ToArray()) node.ProbeSamples.Remove(key);
             }
@@ -80,7 +82,7 @@ public sealed class ProbeService(SettingsService settings, NodeRegistry registry
 
     public ProbeConfigDto Configuration(NodeRuntime node) => new()
     {
-        Targets = Targets.Where(t => node.Meta.Enabled && t.Enabled && t.NodeIds.Contains(node.Id)).Select(t => new ProbeTargetDto
+        Targets = Targets.Where(t => node.Meta.Enabled && t.Enabled && AppliesTo(t, node)).Select(t => new ProbeTargetDto
         {
             Id = t.Id, Revision = t.Revision, Kind = t.Kind, Address = t.Address, Port = (ushort)t.Port,
             IntervalSec = (ushort)t.IntervalSec, TimeoutMs = (ushort)t.TimeoutMs,
@@ -92,7 +94,7 @@ public sealed class ProbeService(SettingsService settings, NodeRegistry registry
         lock (node.Sync)
         {
             if (!node.Meta.Enabled || !node.Registered || !node.Connected || node.ConnectionId != connectionId) return false;
-            var target = Targets.FirstOrDefault(t => t.Id == result.Id && t.Revision == result.Revision && t.Enabled && t.NodeIds.Contains(node.Id));
+            var target = Targets.FirstOrDefault(t => t.Id == result.Id && t.Revision == result.Revision && t.Enabled && AppliesTo(t, node));
             if (target is null || result.Status > 3 || (result.Status == 0 && (result.Microseconds < 0 || result.Microseconds > target.TimeoutMs * 1000))) return false;
             if (!node.ProbeSamples.TryGetValue(target.Revision, out var samples)) node.ProbeSamples[target.Revision] = samples = new Queue<PublicProbePointDto>();
             var ts = LiveSnapshotBuilder.UnixMs(now);
@@ -106,10 +108,12 @@ public sealed class ProbeService(SettingsService settings, NodeRegistry registry
 
     public PublicProbeDto[] Snapshot(NodeRuntime node)
     {
-        lock (node.Sync) return Targets.Where(t => node.Meta.Enabled && t.Enabled && t.NodeIds.Contains(node.Id)).Select(t => new PublicProbeDto
+        lock (node.Sync) return Targets.Where(t => node.Meta.Enabled && t.Enabled && AppliesTo(t, node)).Select(t => new PublicProbeDto
         {
             Id = t.Id, Name = t.Name, Kind = t.Kind, IntervalSec = t.IntervalSec,
             Points = node.ProbeSamples.TryGetValue(t.Revision, out var samples) ? samples.ToArray() : [],
         }).ToArray();
     }
+
+    private static bool AppliesTo(ProbeTarget target, NodeRuntime node) => target.AllNodes || target.NodeIds.Contains(node.Id);
 }
