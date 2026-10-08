@@ -190,7 +190,7 @@ NodeRuntime
     "TimeZone": "",
     "Admin": { "User": "admin", "Password": "" },
     "Jwt": { "Secret": "" },
-    "GeoIp": { "Enabled": true, "BaseUrl": "https://cdn.jsdelivr.net/npm/@ip-location-db/asn-country", "RefreshDays": 7 },
+    "GeoIp": { "Enabled": true, "BaseUrl": "https://github.com/sapics/ip-location-db/releases/download/latest", "Dataset": "server-country", "RefreshDays": 7 },
     "Dev": { "PublicSourceDir": "" }
   },
   "Logging": { "LogLevel": { "Default": "Information", "Microsoft.AspNetCore": "Warning", "Microsoft.EntityFrameworkCore": "Warning" } },
@@ -211,7 +211,8 @@ NodeRuntime
 | `Snm:Admin:Password` | `SNM_ADMIN_PASSWORD` | `Snm__Admin__Password` | 空 → 随机生成并打印 | 仅首次建库生效 |
 | `Snm:Jwt:Secret` | `SNM_JWT_SECRET` | `Snm__Jwt__Secret` | 空 → 生成并存库 | ≥ 32 字符;设置后优先于库中值 |
 | `Snm:GeoIp:Enabled` | `SNM_GEOIP_ENABLED` | `Snm__GeoIp__Enabled` | `true` | |
-| `Snm:GeoIp:BaseUrl` | `SNM_GEOIP_BASE_URL` | `Snm__GeoIp__BaseUrl` | jsDelivr 地址 | 内网可换镜像 |
+| `Snm:GeoIp:BaseUrl` | `SNM_GEOIP_BASE_URL` | `Snm__GeoIp__BaseUrl` | GitHub Releases 地址 | 内网可换镜像 |
+| `Snm:GeoIp:Dataset` | `SNM_GEOIP_DATASET` | `Snm__GeoIp__Dataset` | `server-country` | 数字 CSV 文件名前缀 |
 | `Snm:Dev:PublicSourceDir` | — | `Snm__Dev__PublicSourceDir` | 空 | Development 下直接从 `web/public` 提供 `/` 便于调试 |
 | `Logging:LogLevel:Default` | `SNM_LOG_LEVEL` | `Logging__LogLevel__Default` | `Information` | `Trace/Debug/Information/Warning/Error` |
 | — | `ASPNETCORE_ENVIRONMENT` | | `Production` | |

@@ -48,8 +48,11 @@ public sealed class SnmOptions
 
     public sealed class GeoIpOptions
     {
+        public const string DefaultBaseUrl = "https://github.com/sapics/ip-location-db/releases/download/latest";
+        public const string LegacyBaseUrl = "https://cdn.jsdelivr.net/npm/@ip-location-db/asn-country";
         public bool Enabled { get; set; } = true;
-        public string BaseUrl { get; set; } = "https://cdn.jsdelivr.net/npm/@ip-location-db/asn-country";
+        public string BaseUrl { get; set; } = DefaultBaseUrl;
+        public string Dataset { get; set; } = "server-country";
         public int RefreshDays { get; set; } = 7;
     }
 

@@ -71,6 +71,17 @@ bash scripts/dev.sh                   # 启动 Master(http://127.0.0.1:5080, adm
 
 新增 **Panorama 全景** 主题（卡片/列表、搜索、状态筛选、深浅色、移动端及线路趋势）。在 **系统设置 → 延时探测** 配置节点到指定目标的 ICMP/TCP 测量，再到 **大屏主题** 启用 Panorama。需要同时更新 Master、Web SDK 与参与探测的 Agent；旧 Agent 的性能上报继续兼容。详见 [延时探测使用说明](docs/PROBES.md)。
 
+## 节点国家识别
+
+Master 使用 [ip-location-db 的 server-country](https://github.com/sapics/ip-location-db)
+离线定位库，按服务端捕获的探针连接 IP 查询国家。后台 **系统设置 → GeoIP → 立即刷新**
+会下载最新库并重新计算已有节点的自动国家，结果同步到后台和大屏。
+
+升级 Master 后，旧 `asn-country` 缓存会作为下载前的备用数据，并在启动约 10 秒后尝试迁移；
+下载成功即可纠正已有错误值，无需重装 Agent。下载失败保留原缓存，后台显示错误，可再次手动刷新。
+**节点管理 → 编辑 → 国家覆盖** 的手动选择始终优先；要恢复自动识别，清空该选项。
+自建镜像与数据集配置见 [部署说明](docs/DEPLOY.md#geoip-定位库升级与镜像)。
+
 ## 安全模型
 
 探针只持有节点专属 `AgentKey`,通过 `X-SNM-Agent-Key` 头连接 `/hubs/agent`;Master 对探针的下行消息只有 `configure`(采集间隔)。管理端为 JWT(access + 轮换 refresh),公开大屏只暴露脱敏字段(有测试保证)。

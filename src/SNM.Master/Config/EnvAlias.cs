@@ -18,6 +18,7 @@ public static class EnvAlias
         ("SNM_JWT_SECRET", "Snm:Jwt:Secret"),
         ("SNM_GEOIP_ENABLED", "Snm:GeoIp:Enabled"),
         ("SNM_GEOIP_BASE_URL", "Snm:GeoIp:BaseUrl"),
+        ("SNM_GEOIP_DATASET", "Snm:GeoIp:Dataset"),
         ("SNM_LOG_LEVEL", "Logging:LogLevel:Default"),
     ];
 

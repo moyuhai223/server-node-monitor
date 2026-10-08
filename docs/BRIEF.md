@@ -78,7 +78,7 @@ server-node-monitor/
 - Master 默认监听 `http://127.0.0.1:5080`(appsettings/环境变量可改);TLS/反代由外部(Nginx/1Panel)完成。启用 `ForwardedHeaders`,仅信任 loopback 与配置的代理地址,用于获取探针真实公网 IP。
 - URL 空间:`/` 公开大屏;`/admin/` 管理后台 SPA;`/api/...` REST;`/hubs/agent`(探针,MessagePack,AgentKey 鉴权)、`/hubs/public`(匿名,仅脱敏数据)、`/hubs/admin`(JWT,全量数据)。三个 Hub 均启用 MessagePack 协议。
 - 管理端认证:JWT access + refresh token;单管理员账号;首次启动由 `SNM_ADMIN_USER` / `SNM_ADMIN_PASSWORD`(或 appsettings)初始化,密码哈希(`PasswordHasher` 或 PBKDF2)存 DB;后台可改密。开发模式 Vite dev server 代理 `/api` 与 `/hubs`(含 ws)到 `127.0.0.1:5080`,因此不需要 CORS。
-- GeoIP:离线数据集 `https://cdn.jsdelivr.net/npm/@ip-location-db/asn-country/asn-country-ipv4-num.csv` 与 `.../asn-country-ipv6-num.csv`(每行 `start,end,CC`,IPv4 为 32 位十进制,IPv6 为 128 位十进制整数,已按 start 排序)。首次启动异步下载到 `data/geoip/`,每 7 天刷新;下载失败不影响启动(国家码为空直至下次成功);管理员手动覆盖优先于自动识别。
+- GeoIP:离线数据集 `https://github.com/sapics/ip-location-db/releases/download/latest/server-country-ipv4-num.csv` 与 `.../server-country-ipv6-num.csv`(每行 `start,end,CC`,IPv4 为 32 位十进制,IPv6 为 128 位十进制整数,已按 start 排序)。首次启动异步下载到 `data/geoip/`,每 7 天刷新，成功后重算已有自动国家；旧 npm 缓存自动迁移。下载失败保留原数据，不影响启动；管理员手动覆盖优先于自动识别。
 - 安全红线:Agent 不监听任何端口、无远程执行、无自更新;Master→Agent 的下行消息仅限配置类(如采集间隔),且必须在 PROTOCOL.md 中逐条列明。AgentKey 每节点唯一、随机 ≥32 字节、可在后台轮换。
 - 语言:代码标识符与注释英文;UI 文案简体中文;文档简体中文。
 - 时序保留:热 24h(1 分钟均值)/温 7d(1 小时均值)/冷 30d(1 天均值),>30 天删除。心跳 2s 不落库,在内存聚合为 1 分钟桶后写入。

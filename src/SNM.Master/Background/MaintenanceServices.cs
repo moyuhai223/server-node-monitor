@@ -152,8 +152,8 @@ public sealed class RetentionService(IDbContextFactory<SnmDbContext> dbFactory, 
     }
 }
 
-/// <summary>Every 6 h (first after 10 s): refresh the GeoIP dataset when stale and backfill missing country codes.</summary>
-public sealed class GeoIpRefreshService(GeoIpService geoIp, SettingsService settings, IDbContextFactory<SnmDbContext> dbFactory, NodeRegistry registry, ILogger<GeoIpRefreshService> logger)
+/// <summary>Every 6 h (first after 10 s): refresh stale GeoIP data and reconcile all automatic countries.</summary>
+public sealed class GeoIpRefreshService(GeoIpService geoIp, SettingsService settings, NodeCountryService countries, NodeRegistry registry, ILogger<GeoIpRefreshService> logger)
     : SnmBackgroundService(logger, registry)
 {
     protected override TimeSpan Period => TimeSpan.FromHours(6);
@@ -165,26 +165,12 @@ public sealed class GeoIpRefreshService(GeoIpService geoIp, SettingsService sett
         if (geoIp.NeedsRefresh())
         {
             try { await geoIp.RefreshAsync(ct); }
-            catch (Exception ex) when (ex is not OperationCanceledException) { Logger.LogWarning("GeoIP refresh failed: {Error}", ex.Message); }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+            {
+                Logger.LogWarning("GeoIP refresh failed: {Error}", ex.Message);
+                return;
+            }
         }
-        if (!geoIp.Ready) return;
-
-        var changed = new List<int>();
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        foreach (var node in Registry.All)
-        {
-            var ip = node.RemoteIp.Length > 0 ? node.RemoteIp : node.Meta.LastRemoteIp;
-            if (string.IsNullOrEmpty(ip) || node.Meta.CountryCodeAuto is not null) continue;
-            if (!System.Net.IPAddress.TryParse(ip, out var addr)) continue;
-            var cc = geoIp.Lookup(addr);
-            if (cc is null) continue;
-            var entity = await db.Nodes.FirstOrDefaultAsync(x => x.Id == node.Id, ct);
-            if (entity is null) continue;
-            entity.CountryCodeAuto = cc;
-            await db.SaveChangesAsync(ct);
-            Registry.Upsert(entity);
-            changed.Add(node.Id);
-        }
-        if (changed.Count > 0) Registry.RaiseNodesChanged(changed.ToArray());
+        await countries.RecalculateAsync(ct);
     }
 }

@@ -23,9 +23,9 @@
 ```
 data/
   snm.db  snm.db-wal  snm.db-shm      SQLite 主库(WAL)
-  geoip/asn-country-ipv4-num.csv      GeoIP 数据集(启动异步下载,每 7 天刷新)
-  geoip/asn-country-ipv6-num.csv
-  geoip/meta.json                     {"downloadedAtUtc":"...","ipv4Rows":n,"ipv6Rows":n,"etagV4":"","etagV6":""}
+  geoip/generation-<id>/ipv4.csv     GeoIP 数据集(启动异步下载,每 7 天刷新)
+  geoip/generation-<id>/ipv6.csv
+  geoip/meta.json                     {"generation":"<id>","source":"<baseUrl>/<dataset>","downloadedAtUtc":"...","ipv4Rows":n,"ipv6Rows":n}
   backups/                            手工/脚本备份目录(DEPLOY.md)
 ```
 
@@ -717,10 +717,10 @@ Evaluate(node, rule, subject, cond, value, now):
 
 ## 7. GeoIP 数据与覆盖
 
-- 数据集:`asn-country-ipv4-num.csv`(每行 `start,end,CC`,32 位十进制)、`asn-country-ipv6-num.csv`(128 位十进制),已按 `start` 升序。
+- 数据集:GitHub Releases 的 `server-country-ipv4-num.csv`(每行 `start,end,CC`,32 位十进制)、`server-country-ipv6-num.csv`(128 位十进制),已按 `start` 升序。配置 `Snm:GeoIp:Dataset` 可更改文件名前缀，`BaseUrl` 可指定镜像目录。
 - 加载:解析为 `uint[] StartV4, EndV4; string[] CcV4`(共享字符串池,CC 仅 ~250 个)与 `UInt128[]` 版本;二分查找最后一个 `Start ≤ ip`,校验 `ip ≤ End`。IPv4 映射的 IPv6(`::ffff:a.b.c.d`)按 v4 查;私网/保留地址跳过。
-- 刷新:`GeoIpRefreshService` 每 6 h 检查 `meta.json.downloadedAtUtc` 是否 ≥ 7 d(或文件缺失)→ 下载到 `*.tmp` → 解析验证(行数 > 100 000 / > 10 000)→ 原子 `File.Move(overwrite)` → 热切换内存数组 → 写 `meta.json` 与 `geoip.*` 设置。失败只写 `geoip.lastError`,不影响启动。
-- 触发查询的时机:Agent 连接建立(`LastRemoteIp`)、`status`/`register` 携带的新公网 IP、GeoIP 数据加载完成后对所有 `CountryCodeAuto` 为空的节点补查。
+- 刷新:`GeoIpRefreshService` 启动 10 s 后首次运行，此后每 6 h 检查缓存是否 ≥ 7 d、来源变化或文件缺失。先下载到新 `generation-<id>` 目录，验证两套文件(IPv4 至少 100 000 行 / IPv6 至少 10 000 行，范围有序且不重叠)，再原子替换 `meta.json`，整体切换内存快照。失败/取消保留原清单和数据；成功后清理上一代缓存。旧 `asn-country-*` 文件仍可加载作备用，但必须迁移，不会因下载时间较新而跳过更新。
+- 触发查询的时机:Agent 注册时按 `LastRemoteIp` 查询；手动或定时刷新成功后，`NodeCountryService` 重新计算所有节点的自动国家(包括已有值和有历史连接 IP 的离线节点)。首次后台检查也会从有效的新缓存重算。仅写入有变化的自动字段，对比 IP 避免覆盖并发重连，通知后台与大屏；未知/私网查询保留原值。
 - 覆盖:`Nodes.CountryCodeOverride`(REST 可设/清);展示值 `Override ?? Auto ?? ""`。
 
 ---

@@ -101,11 +101,15 @@ public static class SettingsEndpoints
         });
 
         // ---- geoip
-        g.MapPost("/geoip/refresh", async (GeoIpService geoIp, SettingsService settings, CancellationToken ct) =>
+        g.MapPost("/geoip/refresh", async (GeoIpService geoIp, SettingsService settings, NodeCountryService countries, CancellationToken ct) =>
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(TimeSpan.FromSeconds(90));
-            try { await geoIp.RefreshAsync(cts.Token); }
+            try
+            {
+                await geoIp.RefreshAsync(cts.Token);
+                await countries.RecalculateAsync(cts.Token);
+            }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
                 throw ApiException.Upstream(ApiCodes.GeoIpRefreshFailed, "GeoIP 刷新失败", new { detail = ex.Message });
@@ -119,7 +123,8 @@ public static class SettingsEndpoints
             var status = GeoStatus(geoIp, settings);
             return Results.Ok(ApiResponse.Ok(new
             {
-                status.enabled, status.ready, status.lastRefreshUtc, status.ipv4Rows, status.ipv6Rows, status.lastError,
+                status.Enabled, status.Ready, status.LastRefreshUtc, status.Ipv4Rows, status.Ipv6Rows, status.LastError,
+                status.Dataset, status.BaseUrl,
                 lookup = new { ip = ip?.ToString(), cc = geoIp.Lookup(ip) },
             }));
         });
@@ -131,8 +136,12 @@ public static class SettingsEndpoints
         throw ApiException.Upstream(ApiCodes.ChannelTestFailed, "通知渠道测试失败", new { ok = false, statusCode = r.StatusCode, elapsedMs = r.ElapsedMs, error = r.Error, response = r.Response });
     }
 
-    private static (bool enabled, bool ready, DateTime? lastRefreshUtc, int ipv4Rows, int ipv6Rows, string? lastError) GeoStatus(GeoIpService geoIp, SettingsService settings) =>
-        (settings.Snapshot.GeoIpEnabled, geoIp.Ready, geoIp.LastRefreshUtc, geoIp.Ipv4Rows, geoIp.Ipv6Rows, geoIp.LastError);
+    private sealed record GeoIpStatus(bool Enabled, bool Ready, DateTime? LastRefreshUtc,
+        int Ipv4Rows, int Ipv6Rows, string? LastError, string Dataset, string BaseUrl);
+
+    private static GeoIpStatus GeoStatus(GeoIpService geoIp, SettingsService settings) =>
+        new(settings.Snapshot.GeoIpEnabled, geoIp.Ready, geoIp.LastRefreshUtc, geoIp.Ipv4Rows, geoIp.Ipv6Rows,
+            geoIp.LastError, geoIp.Dataset, geoIp.BaseUrl);
 
     private static JsonObject Export(SettingsService settings, GeoIpService geoIp)
     {
@@ -143,6 +152,8 @@ public static class SettingsEndpoints
         geo["ipv4Rows"] = geoIp.Ipv4Rows;
         geo["ipv6Rows"] = geoIp.Ipv6Rows;
         geo["lastError"] = geoIp.LastError;
+        geo["dataset"] = geoIp.Dataset;
+        geo["baseUrl"] = geoIp.BaseUrl;
         root["geoip"] = geo;
         var ret = root["retention"] as JsonObject ?? new JsonObject();
         ret["metrics1mHours"] = RetentionService.Metrics1mHours;

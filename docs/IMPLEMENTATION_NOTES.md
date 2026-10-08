@@ -35,7 +35,7 @@
 | Windows 探针安装 | schtasks 命令行带参数 | `Register-ScheduledTask`(SYSTEM、开机触发、失败 1 分钟重启),配置写入 `%ProgramData%\snm-agent\agent.env`(ACL 仅 SYSTEM/Administrators),探针用 `--env-file` 读取;卸载/代理通过 `SNM_UNINSTALL=1` / `SNM_PROXY` 环境变量传入(`irm | iex` 不便传参) |
 | Agent `User-Agent` | 覆盖 UA | 使用自定义头 `X-SNM-Agent: snm-agent/<ver> (<os>; <arch>)`,避免与 SignalR 客户端 UA 冲突 |
 | Windows 网卡过滤 | Type/OperStatus/名称规则 | 额外排除 `InterfaceAndOperStatusFlags.FilterInterface`(NDIS 轻量筛选器会镜像计数)与 `Local Area Connection*` 别名 |
-| GeoIP 刷新 | 后台每 6 小时 | 同时尊重 `Snm:GeoIp:Enabled`(配置)与 `geoip.enabled`(运行时设置) |
+| GeoIP 刷新 | 后台每 6 小时 | 默认 GitHub Releases `server-country`，旧 npm 缓存自动迁移；成功后重算所有自动国家。后台与节点重算同时尊重配置/运行时开关；管理员可手动下载，运行时禁用时不重算。两套 CSV 通过单一清单原子发布 |
 | 系统信息 `queues.notificationsPending` | 队列长度 | 单消费者 Channel 不支持 `Count`,改为手动计数 |
 | 时序表 `DiskUsedMb/DiskTotalMb` | — | 1 分钟桶存均值(汇总磁盘),用于 30 天磁盘曲线 |
 | 大屏字节单位 | — | 流量/网速十进制(1 TB = 1000 GB,与商家口径一致);内存/磁盘 1024 进制 |

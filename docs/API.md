@@ -346,7 +346,7 @@
              "expiryDays": 7, "expiryCheckHour": 9, "cooldownMin": 30, "repeatMin": 0, "diskEnabled": false, "diskPct": 90 },
   "finance": { "baseCurrency": "CNY", "rates": { "CNY": 1, "USD": 7.2, "EUR": 7.8 } },
   "auth": { "accessTokenMinutes": 120, "refreshTokenDays": 30, "loginMaxFailures": 5, "loginLockMinutes": 15 },
-  "geoip": { "enabled": true, "lastRefreshUtc": "2026-09-05T03:00:12Z", "ipv4Rows": 231000, "ipv6Rows": 96000, "lastError": null, "ready": true },
+  "geoip": { "enabled": true, "lastRefreshUtc": "2026-09-05T03:00:12Z", "ipv4Rows": 231000, "ipv6Rows": 96000, "lastError": null, "ready": true, "dataset": "server-country", "baseUrl": "https://github.com/sapics/ip-location-db/releases/download/latest" },
   "retention": { "metrics1mHours": 25, "metrics1hDays": 8, "metrics1dDays": 31, "alertEventDays": 180, "deliveryDays": 30, "trafficDailyDays": 400 } } }
 ```
 
@@ -388,7 +388,7 @@ VoceChat 示例：URL 填 `/api/bot/send_to_user/用户ID` 对应的完整地址
 
 ### 6.4 GeoIP
 
-`POST /api/settings/geoip/refresh` → 同步执行下载(最长 60 s);成功 `data: geoip`(6.1 结构);失败 `502/30002`。`GET /api/settings/geoip/status` → `data: geoip` + `"lookup": { "ip": "203.0.113.10", "cc": "US" }`(用请求方 IP 演示)。
+`POST /api/settings/geoip/refresh` → 同步下载并重新计算已有节点的自动国家(最长 90 s，手动覆盖优先);成功 `data: geoip`(6.1 结构);失败 `502/30002`。`dataset`/`baseUrl` 为当前配置的只读来源信息，修改需使用环境配置。`GET /api/settings/geoip/status` → `data: geoip` + `"lookup": { "ip": "203.0.113.10", "cc": "US" }`(用请求方 IP 演示)。
 
 ### 6.5 `GET /api/system/info`
 

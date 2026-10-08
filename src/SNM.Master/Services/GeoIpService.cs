@@ -7,7 +7,7 @@ using SNM.Master.Options;
 
 namespace SNM.Master.Services;
 
-/// <summary>Offline GeoIP (docs/DATA.md 7): ip-location-db asn-country CSVs loaded into sorted arrays, binary search lookup.</summary>
+/// <summary>Offline country lookup using numeric CSV ranges and an atomically published cache generation.</summary>
 public sealed class GeoIpService(IOptions<SnmOptions> options, IHttpClientFactory httpFactory, SettingsService settings, ILogger<GeoIpService> logger)
 {
     private sealed class Table<T>(T[] starts, T[] ends, string[] cc) where T : struct, IComparable<T>
@@ -23,39 +23,54 @@ public sealed class GeoIpService(IOptions<SnmOptions> options, IHttpClientFactor
         }
     }
 
-    private volatile Table<uint>? _v4;
-    private volatile Table<UInt128>? _v6;
+    private sealed record Snapshot(Table<uint> V4, Table<UInt128> V6, DateTime? DownloadedAtUtc, string? Source);
+    private volatile Snapshot? _snapshot;
+    private string? _generation;
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
 
     public bool Enabled => options.Value.GeoIp.Enabled;
-    public bool Ready => _v4 is not null;
-    public int Ipv4Rows => _v4?.Count ?? 0;
-    public int Ipv6Rows => _v6?.Count ?? 0;
-    public DateTime? LastRefreshUtc { get; private set; }
+    public bool Ready => _snapshot is not null;
+    public int Ipv4Rows => _snapshot?.V4.Count ?? 0;
+    public int Ipv6Rows => _snapshot?.V6.Count ?? 0;
+    public DateTime? LastRefreshUtc => _snapshot?.DownloadedAtUtc;
     public string? LastError { get; private set; }
+    public string Dataset => options.Value.GeoIp.Dataset.Trim();
+    public string BaseUrl
+    {
+        get
+        {
+            var url = options.Value.GeoIp.BaseUrl.Trim().TrimEnd('/');
+            // Old installations may explicitly retain the former default in their environment.
+            return Dataset == "server-country" && url == SnmOptions.GeoIpOptions.LegacyBaseUrl
+                ? SnmOptions.GeoIpOptions.DefaultBaseUrl : url;
+        }
+    }
+    private string Source => $"{BaseUrl}/{Dataset}";
 
     private string GeoDir => Path.Combine(options.Value.DataDir, "geoip");
-    private string V4Path => Path.Combine(GeoDir, "asn-country-ipv4-num.csv");
-    private string V6Path => Path.Combine(GeoDir, "asn-country-ipv6-num.csv");
     private string MetaPath => Path.Combine(GeoDir, "meta.json");
+    private string GenerationDir(string generation) => Guid.TryParseExact(generation, "N", out _)
+        ? Path.Combine(GeoDir, "generation-" + generation)
+        : throw new InvalidDataException("GeoIP 缓存版本标识无效");
 
     /// <summary>Returns the upper-case ISO country code, or null when unknown / private / not loaded.</summary>
     public string? Lookup(IPAddress? ip)
     {
         if (ip is null || !IsPublic(ip)) return null;
+        var snapshot = _snapshot;
         if (ip.IsIPv4MappedToIPv6) ip = ip.MapToIPv4();
         if (ip.AddressFamily == AddressFamily.InterNetwork)
         {
             var b = ip.GetAddressBytes();
             var v = ((uint)b[0] << 24) | ((uint)b[1] << 16) | ((uint)b[2] << 8) | b[3];
-            return _v4?.Lookup(v);
+            return snapshot?.V4.Lookup(v);
         }
         if (ip.AddressFamily == AddressFamily.InterNetworkV6)
         {
             var b = ip.GetAddressBytes();
             var hi = System.Buffers.Binary.BinaryPrimitives.ReadUInt64BigEndian(b.AsSpan(0, 8));
             var lo = System.Buffers.Binary.BinaryPrimitives.ReadUInt64BigEndian(b.AsSpan(8, 8));
-            return _v6?.Lookup(new UInt128(hi, lo));
+            return snapshot?.V6.Lookup(new UInt128(hi, lo));
         }
         return null;
     }
@@ -90,54 +105,89 @@ public sealed class GeoIpService(IOptions<SnmOptions> options, IHttpClientFactor
     public async Task TryLoadFromDiskAsync(CancellationToken ct)
     {
         if (!options.Value.GeoIp.Enabled) return;
+        await _refreshGate.WaitAsync(ct);
         try
         {
-            if (!File.Exists(V4Path)) return;
-            await LoadAsync(ct);
+            DateTime? downloadedAt = null;
+            string? generation = null, source = null;
             if (File.Exists(MetaPath))
             {
                 using var doc = JsonDocument.Parse(await File.ReadAllTextAsync(MetaPath, ct));
                 if (doc.RootElement.TryGetProperty("downloadedAtUtc", out var d) && DateTime.TryParse(d.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var dt))
-                    LastRefreshUtc = dt;
+                    downloadedAt = dt;
+                if (doc.RootElement.TryGetProperty("generation", out var g)) generation = g.GetString();
+                if (doc.RootElement.TryGetProperty("source", out var s)) source = s.GetString();
             }
+            var dir = generation is null ? GeoDir : GenerationDir(generation);
+            var v4Path = Path.Combine(dir, generation is null ? "asn-country-ipv4-num.csv" : "ipv4.csv");
+            var v6Path = Path.Combine(dir, generation is null ? "asn-country-ipv6-num.csv" : "ipv6.csv");
+            if (!File.Exists(v4Path)) return;
+            var v4 = await Task.Run(() => ParseV4(v4Path), ct);
+            var v6 = generation is not null || File.Exists(v6Path)
+                ? await Task.Run(() => ParseV6(v6Path), ct) : new Table<UInt128>([], [], []);
+            if (v4.Count == 0) throw new InvalidDataException("GeoIP IPv4 缓存为空");
+            if (generation is not null && v6.Count == 0) throw new InvalidDataException("GeoIP IPv6 缓存为空");
+            ct.ThrowIfCancellationRequested();
+            // A legacy cache remains usable, but can never satisfy the new source identity.
+            _snapshot = new(v4, v6, downloadedAt, generation is null ? null : source);
+            _generation = generation;
+            LastError = null;
             logger.LogInformation("GeoIP loaded from disk: {V4} IPv4 ranges, {V6} IPv6 ranges", Ipv4Rows, Ipv6Rows);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             LastError = ex.Message;
             logger.LogWarning(ex, "GeoIP data on disk could not be loaded");
         }
+        finally { _refreshGate.Release(); }
     }
 
-    public bool NeedsRefresh() => !Ready || LastRefreshUtc is null || (DateTime.UtcNow - LastRefreshUtc.Value).TotalDays >= Math.Max(1, options.Value.GeoIp.RefreshDays);
+    public bool NeedsRefresh() => !Ready || _snapshot?.Source != Source || LastRefreshUtc is null
+        || (DateTime.UtcNow - LastRefreshUtc.Value).TotalDays >= Math.Max(1, options.Value.GeoIp.RefreshDays);
 
     /// <summary>Downloads both CSVs to temp files, validates, atomically replaces and hot-swaps the tables. Throws on failure.</summary>
     public async Task RefreshAsync(CancellationToken ct)
     {
         if (!options.Value.GeoIp.Enabled) throw new InvalidOperationException("GeoIP 已在配置中禁用");
         await _refreshGate.WaitAsync(ct);
+        string? stagingDir = null;
+        var metaTmp = MetaPath + ".tmp";
         try
         {
+            if (Dataset.Length == 0 || Dataset.Any(c => !(c is >= 'a' and <= 'z' or >= '0' and <= '9' or '-')))
+                throw new InvalidOperationException("GeoIP Dataset 只能包含小写字母、数字和连字符");
             Directory.CreateDirectory(GeoDir);
             var http = httpFactory.CreateClient("geoip");
-            var baseUrl = options.Value.GeoIp.BaseUrl.TrimEnd('/');
-            var v4Tmp = V4Path + ".tmp";
-            var v6Tmp = V6Path + ".tmp";
-            await DownloadAsync(http, $"{baseUrl}/asn-country-ipv4-num.csv", v4Tmp, ct);
-            await DownloadAsync(http, $"{baseUrl}/asn-country-ipv6-num.csv", v6Tmp, ct);
+            var generation = Guid.NewGuid().ToString("N");
+            stagingDir = GenerationDir(generation);
+            Directory.CreateDirectory(stagingDir);
+            var v4Tmp = Path.Combine(stagingDir, "ipv4.csv");
+            var v6Tmp = Path.Combine(stagingDir, "ipv6.csv");
+            await DownloadAsync(http, $"{Source}-ipv4-num.csv", v4Tmp, ct);
+            await DownloadAsync(http, $"{Source}-ipv6-num.csv", v6Tmp, ct);
             var (v4, v6) = (ParseV4(v4Tmp), ParseV6(v6Tmp));
             if (v4.Count < 100_000) throw new InvalidDataException($"IPv4 数据集行数异常({v4.Count})");
             if (v6.Count < 10_000) throw new InvalidDataException($"IPv6 数据集行数异常({v6.Count})");
-            File.Move(v4Tmp, V4Path, overwrite: true);
-            File.Move(v6Tmp, V6Path, overwrite: true);
-            _v4 = v4; _v6 = v6;
-            LastRefreshUtc = DateTime.UtcNow;
+            var snapshot = new Snapshot(v4, v6, DateTime.UtcNow, Source);
+            await File.WriteAllTextAsync(metaTmp, JsonSerializer.Serialize(new
+            {
+                generation, source = snapshot.Source, downloadedAtUtc = snapshot.DownloadedAtUtc!.Value.ToString("O"),
+                ipv4Rows = v4.Count, ipv6Rows = v6.Count,
+            }), ct);
+            ct.ThrowIfCancellationRequested();
+            // This one rename commits both complete files. Before it, the old manifest
+            // and in-memory tables remain intact even if the second download fails.
+            File.Move(metaTmp, MetaPath, overwrite: true);
+            var previous = _generation;
+            _generation = generation;
+            _snapshot = snapshot;
+            stagingDir = null;
             LastError = null;
-            await File.WriteAllTextAsync(MetaPath, JsonSerializer.Serialize(new { downloadedAtUtc = LastRefreshUtc.Value.ToString("O"), ipv4Rows = v4.Count, ipv6Rows = v6.Count }), ct);
+            if (previous is not null) DeleteGeneration(GenerationDir(previous));
             await PublishStatusAsync(ct);
             logger.LogInformation("GeoIP refreshed: {V4} IPv4 ranges, {V6} IPv6 ranges", v4.Count, v6.Count);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             LastError = ex.Message;
             logger.LogWarning(ex, "GeoIP refresh failed");
@@ -146,8 +196,17 @@ public sealed class GeoIpService(IOptions<SnmOptions> options, IHttpClientFactor
         }
         finally
         {
+            if (stagingDir is not null) DeleteGeneration(stagingDir);
+            try { File.Delete(metaTmp); } catch (IOException) { } catch (UnauthorizedAccessException) { }
             _refreshGate.Release();
         }
+    }
+
+    private void DeleteGeneration(string dir)
+    {
+        try { Directory.Delete(dir, recursive: true); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        { logger.LogDebug(ex, "Could not remove unused GeoIP cache {Directory}", dir); }
     }
 
     private async Task PublishStatusAsync(CancellationToken ct)
@@ -176,13 +235,6 @@ public sealed class GeoIpService(IOptions<SnmOptions> options, IHttpClientFactor
         await resp.Content.CopyToAsync(fs, ct);
     }
 
-    private async Task LoadAsync(CancellationToken ct)
-    {
-        var v4 = await Task.Run(() => ParseV4(V4Path), ct);
-        var v6 = File.Exists(V6Path) ? await Task.Run(() => ParseV6(V6Path), ct) : new Table<UInt128>([], [], []);
-        _v4 = v4; _v6 = v6;
-    }
-
     private static Table<uint> ParseV4(string path)
     {
         var starts = new List<uint>(300_000); var ends = new List<uint>(300_000); var cc = new List<string>(300_000);
@@ -190,17 +242,18 @@ public sealed class GeoIpService(IOptions<SnmOptions> options, IHttpClientFactor
         foreach (var line in File.ReadLines(path))
         {
             var span = line.AsSpan();
-            var c1 = span.IndexOf(','); if (c1 < 0) continue;
+            if (span.IsWhiteSpace()) continue;
+            var c1 = span.IndexOf(','); if (c1 < 0) throw new InvalidDataException("GeoIP CSV 格式无效");
             var rest = span[(c1 + 1)..];
-            var c2 = rest.IndexOf(','); if (c2 < 0) continue;
-            if (!uint.TryParse(span[..c1], NumberStyles.None, CultureInfo.InvariantCulture, out var s)) continue;
-            if (!uint.TryParse(rest[..c2], NumberStyles.None, CultureInfo.InvariantCulture, out var e)) continue;
+            var c2 = rest.IndexOf(','); if (c2 < 0) throw new InvalidDataException("GeoIP CSV 格式无效");
+            if (!uint.TryParse(span[..c1], NumberStyles.None, CultureInfo.InvariantCulture, out var s)) throw new InvalidDataException("GeoIP IPv4 起始地址无效");
+            if (!uint.TryParse(rest[..c2], NumberStyles.None, CultureInfo.InvariantCulture, out var e)) throw new InvalidDataException("GeoIP IPv4 结束地址无效");
             var code = rest[(c2 + 1)..].Trim().ToString().ToUpperInvariant();
-            if (code.Length != 2) continue;
+            if (code.Length != 2 || code.Any(c => c is < 'A' or > 'Z')) throw new InvalidDataException("GeoIP 国家码无效");
             if (!pool.TryGetValue(code, out var pooled)) { pooled = code; pool[code] = code; }
             starts.Add(s); ends.Add(e); cc.Add(pooled);
         }
-        EnsureSorted(starts);
+        EnsureSorted(starts, ends);
         return new Table<uint>(starts.ToArray(), ends.ToArray(), cc.ToArray());
     }
 
@@ -211,25 +264,27 @@ public sealed class GeoIpService(IOptions<SnmOptions> options, IHttpClientFactor
         foreach (var line in File.ReadLines(path))
         {
             var span = line.AsSpan();
-            var c1 = span.IndexOf(','); if (c1 < 0) continue;
+            if (span.IsWhiteSpace()) continue;
+            var c1 = span.IndexOf(','); if (c1 < 0) throw new InvalidDataException("GeoIP CSV 格式无效");
             var rest = span[(c1 + 1)..];
-            var c2 = rest.IndexOf(','); if (c2 < 0) continue;
-            if (!UInt128.TryParse(span[..c1], NumberStyles.None, CultureInfo.InvariantCulture, out var s)) continue;
-            if (!UInt128.TryParse(rest[..c2], NumberStyles.None, CultureInfo.InvariantCulture, out var e)) continue;
+            var c2 = rest.IndexOf(','); if (c2 < 0) throw new InvalidDataException("GeoIP CSV 格式无效");
+            if (!UInt128.TryParse(span[..c1], NumberStyles.None, CultureInfo.InvariantCulture, out var s)) throw new InvalidDataException("GeoIP IPv6 起始地址无效");
+            if (!UInt128.TryParse(rest[..c2], NumberStyles.None, CultureInfo.InvariantCulture, out var e)) throw new InvalidDataException("GeoIP IPv6 结束地址无效");
             var code = rest[(c2 + 1)..].Trim().ToString().ToUpperInvariant();
-            if (code.Length != 2) continue;
+            if (code.Length != 2 || code.Any(c => c is < 'A' or > 'Z')) throw new InvalidDataException("GeoIP 国家码无效");
             if (!pool.TryGetValue(code, out var pooled)) { pooled = code; pool[code] = code; }
             starts.Add(s); ends.Add(e); cc.Add(pooled);
         }
-        EnsureSorted(starts);
+        EnsureSorted(starts, ends);
         return new Table<UInt128>(starts.ToArray(), ends.ToArray(), cc.ToArray());
     }
 
-    private static void EnsureSorted<T>(List<T> starts) where T : IComparable<T>
+    private static void EnsureSorted<T>(List<T> starts, List<T> ends) where T : IComparable<T>
     {
-        for (var i = 1; i < starts.Count; i++)
+        for (var i = 0; i < starts.Count; i++)
         {
-            if (starts[i - 1].CompareTo(starts[i]) > 0) throw new InvalidDataException("GeoIP 数据集未按起始地址排序");
+            if (starts[i].CompareTo(ends[i]) > 0 || (i > 0 && ends[i - 1].CompareTo(starts[i]) >= 0))
+                throw new InvalidDataException("GeoIP 地址范围无效、重叠或未排序");
         }
     }
 }

@@ -97,6 +97,7 @@ builder.Services.AddHttpClient("notify", c =>
 builder.Services.AddSingleton<SettingsService>();
 builder.Services.AddSingleton<NodeRegistry>();
 builder.Services.AddSingleton<GeoIpService>();
+builder.Services.AddSingleton<NodeCountryService>();
 builder.Services.AddSingleton<AgentConnectionTracker>();
 builder.Services.AddSingleton<NodeIngestService>();
 builder.Services.AddSingleton<LiveSnapshotBuilder>();

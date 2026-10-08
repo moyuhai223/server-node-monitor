@@ -621,11 +621,36 @@ jobs:
 | `SNM_TIMEZONE` | `Snm:TimeZone` | 服务器本地 | 站点时区(首启写入设置) |
 | `SNM_ADMIN_USER` / `SNM_ADMIN_PASSWORD` | `Snm:Admin:User/Password` | `admin` / 随机 | 首次初始化 |
 | `SNM_JWT_SECRET` | `Snm:Jwt:Secret` | 自动生成 | JWT 签名密钥 |
-| `SNM_GEOIP_ENABLED` / `SNM_GEOIP_BASE_URL` | `Snm:GeoIp:*` | `true` / jsDelivr | GeoIP |
+| `SNM_GEOIP_ENABLED` / `SNM_GEOIP_BASE_URL` | `Snm:GeoIp:*` | `true` / GitHub Releases | GeoIP |
+| `SNM_GEOIP_DATASET` | `Snm:GeoIp:Dataset` | `server-country` | 数字 CSV 文件名前缀 |
 | `SNM_LOG_LEVEL` | `Logging:LogLevel:Default` | `Information` | 日志级别 |
 | `ASPNETCORE_ENVIRONMENT` | — | `Production` | 环境 |
 
 Agent 侧环境变量见 PROTOCOL.md §7.2(`SNM_SERVER`、`SNM_KEY`、`SNM_PROXY`、`SNM_INTERVAL`、`SNM_NAME`、`SNM_NET_IF`、`SNM_DISK_INCLUDE`、`SNM_TRANSPORT`、`SNM_INSECURE`、`SNM_LOG_LEVEL`)。
+
+### GeoIP 定位库升级与镜像
+
+默认使用 GitHub Releases 的 `server-country` 数字 CSV。该库面向服务器位置；旧 npm
+`asn-country` 上游已提示数据错误并停止更新。升级 Master 后，旧缓存仍可备用，但即使时间很新
+也会在启动约 10 秒后的后台检查中尝试迁移。迁移成功后自动重算已有国家，并保留手动覆盖。
+Agent 无需为此升级；后台 **系统设置 → GeoIP → 立即刷新** 可立即下载并重算。
+
+若主控不能访问 GitHub Releases，可把两套文件同步到可访问的镜像目录，配置：
+
+```ini
+SNM_GEOIP_BASE_URL=https://mirror.example/geoip
+SNM_GEOIP_DATASET=server-country
+```
+
+程序请求 `<BaseUrl>/<Dataset>-ipv4-num.csv` 与 `<BaseUrl>/<Dataset>-ipv6-num.csv`，
+文件必须为已排序、无重叠的 `start,end,CC` 数字范围(IPv6 是 128 位十进制整数)。
+使用其他数据集时需匹配文件名前缀并遵守该数据集许可。修改环境后重启 Master。
+
+保留旧默认地址 `https://cdn.jsdelivr.net/npm/@ip-location-db/asn-country` 且数据集仍为
+默认 `server-country` 的配置会自动转向新发布地址；自定义镜像不会被改写，需要提供新文件，
+或显式设置其实际 `SNM_GEOIP_DATASET`。切换来源会强制更新，不等待 7 天。
+下载失败、超时或取消均保留旧内存与磁盘数据；失败/超时会在后台显示错误且不会停止后台服务。
+恢复网络后可手动重试，或等待下次 6 小时检查。
 
 ---
 
@@ -675,7 +700,7 @@ Docker:`docker compose pull && docker compose up -d`(卷内数据自动迁移)�
 | 节点始终 Unknown | Agent 日志:`authentication rejected (HTTP 401)` → Key 错误/节点禁用;`negotiate` 404 → `--server` 少了协议或路径不对(只填 origin);TLS 错误 → 证书链或时间不同步 |
 | 只走 LongPolling(日志 `transport=LongPolling`) | 反代未转发 `Upgrade/Connection` 头(§2.3/§2.4);可用但配置下发延迟高 |
 | 公网 IP 显示为 127.0.0.1 / 内网 IP | `SNM_KNOWN_PROXIES`/`SNM_KNOWN_NETWORKS` 未包含反代地址;或 Nginx 未设 `X-Forwarded-For` |
-| 国家码为空 | GeoIP 尚未下载(后台设置 → GeoIP 状态/刷新);服务器无法访问 jsDelivr → 设 `SNM_GEOIP_BASE_URL` 镜像 |
+| 国家码为空或不准确 | 后台设置 → GeoIP 查看来源/错误并刷新；检查节点详情的“服务端捕获 IP”和“国家覆盖”；无法访问 GitHub Releases 时配置镜像，见下文 |
 | 流量数值突增 | 查看节点 `netIfs` 是否变化(新网卡历史累计被计入已通过重基线规避);节点是否重启(DATA.md §4.3) |
 | 告警未发送 | 设置 → 通知渠道 → 测试;`/api/alerts/{id}` 的 `deliveries` 查看错误;冷却期内的新触发不通知(事件 `notified=false`) |
 | 数据库变大 | `PRAGMA wal_checkpoint` 是否执行(每日 03:00);`RetentionService` 日志;`/api/system/info.dbSizeBytes/walSizeBytes` |

@@ -111,7 +111,7 @@
           <n-space class="mt-12" align="center">
             <span>启用 GeoIP</span><n-switch v-model:value="settings.geoip.enabled" @update:value="save(['geoip'])" />
             <n-button :loading="geoRefreshing" @click="geoRefresh">立即刷新</n-button>
-            <span class="text-12 opacity-50">数据源：@ip-location-db/asn-country (jsDelivr)</span>
+            <span class="text-12 opacity-50" :title="settings.geoip.baseUrl">数据源：{{ settings.geoip.dataset || 'server-country' }}</span>
           </n-space>
         </n-tab-pane>
 
