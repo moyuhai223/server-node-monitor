@@ -1,0 +1,11 @@
+{
+  "id": "emerald",
+  "name": "Emerald 绿宝石",
+  "version": "1.0.0",
+  "author": "binaryu / Tokinx · SNM adaptation",
+  "description": "Emerald 原界面，保留 Vue 组件、Cobe 地球、地图与图表；通过 SNM 公开主题 SDK 接入。",
+  "homepage": "https://github.com/binaryu/monitor-theme-emerald",
+  "entry": "index.html",
+  "preview": "preview.png",
+  "sdk": 1
+}

@@ -146,3 +146,9 @@ hist = { ts[], cpu[], mem[], rx[], tx[] }   // 最近 60 点(在线时每 2 秒�
 - SDK 版本由 `SDK_VERSION` / `/api/settings/themes` 的 `sdk` 字段给出;新增字段和事件不升版本,破坏性变更才升。
 - 主题清单的 `sdk` 大于 Master 支持的版本时拒绝安装。
 - 主题统一放在本仓库 `web/themes/` 维护;zip 上传通道保留给需要在不升级 Master 的情况下单独分发/覆盖主题的场景。
+
+## Emerald 可选主题
+
+Emerald 的上游原界面保留在独立适配源码 `web/emerald-snm/`，不替换 default、minimal 或 panorama。统一运行 `bash scripts/build-web.sh` 时，以冻结的 pnpm 锁文件构建为 `web/themes/emerald/`；需 Node.js 22 和源码 package.json 指定的 pnpm。CI 和 Docker 使用同一构建步骤，生成产物不提交。
+
+单独构建见 `web/emerald-snm/README.md`；安装包使用 `bash scripts/pack-theme.sh web/themes/emerald`。新增主题不改变当前选择，管理员可在“系统设置 → 大屏主题”自行预览或启用。最近历史、数据可见性及公开字段限制仍以 SDK 为准，地球标记是国家中心点而非 IP 精确位置。

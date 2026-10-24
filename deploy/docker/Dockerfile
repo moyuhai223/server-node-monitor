@@ -8,8 +8,11 @@ RUN apk add --no-cache bash
 WORKDIR /src
 COPY web/admin/package.json web/admin/package-lock.json* web/admin/
 COPY web/sdk/package.json web/sdk/package-lock.json* web/sdk/
+COPY web/emerald-snm/package.json web/emerald-snm/pnpm-lock.yaml web/emerald-snm/
+RUN corepack enable && corepack prepare pnpm@10.5.2 --activate
 RUN cd web/admin && (npm ci --no-audit --no-fund || npm install --no-audit --no-fund) \
- && cd ../sdk && (npm ci --no-audit --no-fund || npm install --no-audit --no-fund)
+ && cd ../sdk && (npm ci --no-audit --no-fund || npm install --no-audit --no-fund) \
+ && cd ../emerald-snm && pnpm install --frozen-lockfile --ignore-scripts
 COPY web/ web/
 COPY scripts/build-web.sh scripts/
 RUN bash scripts/build-web.sh --out /out/wwwroot --skip-install

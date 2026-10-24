@@ -36,3 +36,6 @@ Thumbs.db
 .idea/
 spikes/
 /.local/
+
+# Compiled Emerald theme; built reproducibly from web/emerald-snm by build-web.sh
+/web/themes/emerald/

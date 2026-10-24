@@ -20,7 +20,19 @@ install_deps() {
   local dir="$1"
   if [ -f "$dir/package-lock.json" ]; then (cd "$dir" && npm ci --no-audit --no-fund); else (cd "$dir" && npm install --no-audit --no-fund); fi
 }
-if [ "$SKIP" = 0 ]; then install_deps web/admin; install_deps web/sdk; fi
+# Emerald is built from its preserved Vue UI, not a hand-written replacement.
+PNPM=pnpm
+if ! command -v "$PNPM" >/dev/null 2>&1; then
+  # Windows desktop runtimes may expose only a pnpm.cmd shim.
+  PNPM=pnpm.cmd
+  command -v "$PNPM" >/dev/null 2>&1 || { echo "pnpm is required (see web/emerald-snm/package.json packageManager)" >&2; exit 2; }
+fi
+if [ "$SKIP" = 0 ]; then
+  install_deps web/admin
+  install_deps web/sdk
+  (cd web/emerald-snm && "$PNPM" install --frozen-lockfile --ignore-scripts)
+fi
+(cd web/emerald-snm && "$PNPM" run build)
 
 # admin SPA -> $OUT/admin (vite.config.js reads VITE_OUT_DIR)
 rm -rf "$OUT_ABS/admin"

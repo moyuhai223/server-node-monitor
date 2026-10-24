@@ -22,10 +22,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: web/emerald-snm/package.json
+          run_install: false
       - name: Build web assets
         run: bash scripts/build-web.sh
       - name: Test public probe SDK and theme statistics
-        run: node --test scripts/probes.test.mjs
+        run: node --test scripts/probes.test.mjs scripts/emerald-theme.test.mjs
       - name: Build solution
         run: dotnet build ServerNodeMonitor.slnx -c Release
       - name: Test
@@ -55,6 +59,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: web/emerald-snm/package.json
+          run_install: false
       - run: bash scripts/build-web.sh
       - name: Publish master
         run: |
