@@ -145,18 +145,11 @@ public sealed class PublicHub(LiveSnapshotBuilder builder, SNM.Master.Api.Endpoi
 
 /// <summary>/hubs/admin - JWT protected, full live data.</summary>
 [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Roles = "admin")]
-public sealed class AdminHub(LiveSnapshotBuilder builder, SNM.Master.Api.Endpoints.HubStats stats) : Hub
+public sealed class AdminHub(LiveSnapshotBuilder builder) : Hub
 {
     public override async Task OnConnectedAsync()
     {
-        stats.AdminConnected();
         await Clients.Caller.SendAsync(AdminHubMethods.Snapshot, builder.AdminSnapshot(DateTime.UtcNow), Context.ConnectionAborted);
-    }
-
-    public override Task OnDisconnectedAsync(Exception? exception)
-    {
-        stats.AdminDisconnected();
-        return Task.CompletedTask;
     }
 
     [HubMethodName(AdminHubMethods.GetSnapshot)]

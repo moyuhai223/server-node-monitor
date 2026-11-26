@@ -1,5 +1,5 @@
 using System.Net;
-using System.Security.Claims;
+using Microsoft.AspNetCore.SignalR;
 using System.Threading.RateLimiting;
 using MessagePack;
 using Microsoft.AspNetCore.Authentication;
@@ -103,6 +103,8 @@ builder.Services.AddSingleton<NodeIngestService>();
 builder.Services.AddSingleton<LiveSnapshotBuilder>();
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddSingleton<AdminUserService>();
+builder.Services.AddSingleton<AdminSessionState>();
+builder.Services.AddSingleton<AdminLiveClients>();
 builder.Services.AddSingleton<NodeService>();
 builder.Services.AddSingleton<InstallScriptService>();
 builder.Services.AddSingleton<ThemeService>();
@@ -143,9 +145,8 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
         },
         OnTokenValidated = async ctx =>
         {
-            var sub = ctx.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            var tv = ctx.Principal?.FindFirst(JwtTokenService.TokenVersionClaim)?.Value;
-            if (!int.TryParse(sub, out var userId) || !int.TryParse(tv, out var version) || await users.GetTokenVersionAsync(userId, ctx.HttpContext.RequestAborted) != version)
+            if (!AdminSessionState.TryReadClaims(ctx.Principal, out var userId, out var version) ||
+                await users.GetTokenVersionAsync(userId, ctx.HttpContext.RequestAborted) != version)
                 ctx.Fail("token version mismatch");
         },
     };
@@ -183,6 +184,7 @@ builder.Services.AddSignalR(o =>
         // StandardResolver honours [MessagePackObject]/[Key]; UntrustedData hardens against hostile agents.
         o.SerializerOptions = MessagePackSerializerOptions.Standard.WithSecurity(MessagePackSecurity.UntrustedData);
     })
+    .AddHubOptions<AdminHub>(o => o.AddFilter<AdminSessionFilter>())
     .AddHubOptions<PublicHub>(o => o.MaximumReceiveMessageSize = 1024);
 
 var app = builder.Build();

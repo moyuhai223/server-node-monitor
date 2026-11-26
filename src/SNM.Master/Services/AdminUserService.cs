@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using SNM.Master.Api;
@@ -11,10 +10,8 @@ namespace SNM.Master.Services;
 
 /// <summary>Single-admin account: seeding, login with lockout, password/profile changes, token-version cache.</summary>
 public sealed class AdminUserService(IDbContextFactory<SnmDbContext> dbFactory, JwtTokenService jwt, SettingsService settings,
-    IOptions<SnmOptions> options, ILogger<AdminUserService> logger)
+    AdminSessionState sessions, IOptions<SnmOptions> options, ILogger<AdminUserService> logger)
 {
-    private readonly ConcurrentDictionary<int, int> _tokenVersions = new();
-
     public async Task SeedAsync(CancellationToken ct)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
@@ -46,12 +43,10 @@ public sealed class AdminUserService(IDbContextFactory<SnmDbContext> dbFactory, 
     /// <summary>Token version of the user (cached; -1 when the user does not exist).</summary>
     public async ValueTask<int> GetTokenVersionAsync(int userId, CancellationToken ct)
     {
-        if (_tokenVersions.TryGetValue(userId, out var v)) return v;
+        if (sessions.TryGetVersion(userId, out var v)) return v;
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var row = await db.AdminUsers.AsNoTracking().Where(u => u.Id == userId).Select(u => new { u.TokenVersion }).FirstOrDefaultAsync(ct);
-        v = row?.TokenVersion ?? -1;
-        _tokenVersions[userId] = v;
-        return v;
+        return sessions.ObserveVersion(userId, row?.TokenVersion ?? -1);
     }
 
     public async Task<TokenPair> LoginAsync(string? username, string? password, string? userAgent, string? ip, CancellationToken ct)
@@ -93,7 +88,7 @@ public sealed class AdminUserService(IDbContextFactory<SnmDbContext> dbFactory, 
         user.LockedUntil = null;
         user.LastLoginAt = now;
         await db.SaveChangesAsync(ct);
-        _tokenVersions[user.Id] = user.TokenVersion;
+        sessions.ObserveVersion(user.Id, user.TokenVersion);
         logger.LogInformation("User '{User}' logged in from {Ip}", username, ip);
         return await jwt.IssueAsync(user, userAgent, ip, ct);
     }
@@ -124,12 +119,15 @@ public sealed class AdminUserService(IDbContextFactory<SnmDbContext> dbFactory, 
     public async Task LogoutAllAsync(int id, CancellationToken ct)
     {
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var user = await db.AdminUsers.FirstOrDefaultAsync(u => u.Id == id, ct);
-        if (user is null) return;
-        user.TokenVersion++;
-        await db.SaveChangesAsync(ct);
-        _tokenVersions[id] = user.TokenVersion;
-        await jwt.RevokeAsync(id, null, all: true, ct);
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var user = db.AdminUsers.Where(u => u.Id == id);
+        if (await user.ExecuteUpdateAsync(s => s.SetProperty(u => u.TokenVersion, u => u.TokenVersion + 1), ct) == 0) return;
+        var version = await user.Select(u => u.TokenVersion).SingleAsync(ct);
+        var now = DateTime.UtcNow;
+        await db.RefreshTokens.Where(t => t.UserId == id && t.RevokedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, now), ct);
+        await transaction.CommitAsync(CancellationToken.None);
+        sessions.ObserveVersion(id, version);
     }
 
     public async Task<AdminUser> UpdateProfileAsync(int id, string? nickName, string? avatar, string? email, CancellationToken ct)

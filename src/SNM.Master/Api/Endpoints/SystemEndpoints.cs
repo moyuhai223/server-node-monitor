@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using SNM.Contracts;
 using SNM.Master.Alerting;
 using SNM.Master.Background;
+using SNM.Master.Auth;
 using SNM.Master.Data;
 using SNM.Master.Runtime;
 using SNM.Master.Services;
@@ -62,13 +63,11 @@ public static class SystemEndpoints
 }
 
 /// <summary>Live browser connection counters for /api/system/info.</summary>
-public sealed class HubStats
+public sealed class HubStats(AdminSessionState sessions)
 {
-    private int _public, _admin;
+    private int _public;
     public int PublicClients => Volatile.Read(ref _public);
-    public int AdminClients => Volatile.Read(ref _admin);
+    public int AdminClients => sessions.ConnectionCount;
     public void PublicConnected() => Interlocked.Increment(ref _public);
     public void PublicDisconnected() => Interlocked.Decrement(ref _public);
-    public void AdminConnected() => Interlocked.Increment(ref _admin);
-    public void AdminDisconnected() => Interlocked.Decrement(ref _admin);
 }

@@ -84,24 +84,29 @@ public sealed class JwtTokenService(IOptions<SnmOptions> options, SettingsServic
         if (string.IsNullOrWhiteSpace(refreshToken) || refreshToken.Length > 128) return null;
         var hash = Tokens.Sha256Base64(refreshToken);
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var row = await db.RefreshTokens.FirstOrDefaultAsync(x => x.TokenHash == hash, ct);
+        // A random/unknown token is a read-only miss; do not take SQLite's writer lock for it.
+        var row = await db.RefreshTokens.AsNoTracking().Where(x => x.TokenHash == hash)
+            .Select(x => new { x.Id, x.UserId }).SingleOrDefaultAsync(ct);
         if (row is null) return null;
-        var now = DateTime.UtcNow;
-        if (row.RevokedAt is not null)
-        {
-            // Replay of a rotated token: revoke everything for this user.
-            logger.LogWarning("Refresh token replay detected for user {UserId} from {Ip}; revoking all sessions", row.UserId, ip);
-            await db.RefreshTokens.Where(x => x.UserId == row.UserId && x.RevokedAt == null).ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAt, now), ct);
-            return null;
-        }
-        if (row.ExpiresAt <= now) return null;
-        var user = await db.AdminUsers.FirstOrDefaultAsync(x => x.Id == row.UserId, ct);
-        if (user is null) return null;
 
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var now = DateTime.UtcNow;
         var newRefresh = Tokens.RandomBase64Url();
         var newHash = Tokens.Sha256Base64(newRefresh);
-        row.RevokedAt = now;
-        row.ReplacedByHash = newHash;
+        if (!await TryClaimAsync(db, row.Id, now, newHash, ct))
+        {
+            // A revoked token (including a lost rotation race) follows the existing replay policy.
+            // An expired or deleted row must not invalidate unrelated refresh tokens.
+            if (await db.RefreshTokens.AnyAsync(x => x.Id == row.Id && x.RevokedAt != null, ct))
+            {
+                await db.RefreshTokens.Where(x => x.UserId == row.UserId && x.RevokedAt == null)
+                    .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAt, now), ct);
+                await transaction.CommitAsync(ct);
+                logger.LogWarning("Refresh token replay for user {UserId} from {Ip}; revoked all refresh tokens", row.UserId, ip);
+            }
+            return null;
+        }
+        var user = await db.AdminUsers.AsNoTracking().SingleAsync(x => x.Id == row.UserId, ct);
         db.RefreshTokens.Add(new RefreshToken
         {
             UserId = user.Id, TokenHash = newHash,
@@ -110,8 +115,14 @@ public sealed class JwtTokenService(IOptions<SnmOptions> options, SettingsServic
         });
         await db.SaveChangesAsync(ct);
         var access = CreateAccessToken(user, out var expiresIn);
+        await transaction.CommitAsync(ct);
         return new TokenPair(access, newRefresh, expiresIn);
     }
+
+    // The affected row count, not an earlier read, determines ownership of this one-use claim.
+    internal static async Task<bool> TryClaimAsync(SnmDbContext db, long id, DateTime now, string successorHash, CancellationToken ct) =>
+        await db.RefreshTokens.Where(x => x.Id == id && x.RevokedAt == null && x.ExpiresAt > now)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.RevokedAt, now).SetProperty(x => x.ReplacedByHash, successorHash), ct) == 1;
 
     public async Task RevokeAsync(int userId, string? refreshToken, bool all, CancellationToken ct)
     {

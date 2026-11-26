@@ -12,14 +12,14 @@ namespace SNM.Master.Background;
 public sealed class RealtimeBroadcaster : SnmBackgroundService
 {
     private readonly IHubContext<PublicHub> _publicHub;
-    private readonly IHubContext<AdminHub> _adminHub;
+    private readonly AdminLiveClients _adminHub;
     private readonly LiveSnapshotBuilder _builder;
     private readonly SettingsService _settings;
     private readonly ProbeService _probes;
     private readonly ConcurrentQueue<int[]> _metaChanges = new();
-    private volatile bool _siteChanged;
+    private int _siteChanged;
 
-    public RealtimeBroadcaster(IHubContext<PublicHub> publicHub, IHubContext<AdminHub> adminHub, LiveSnapshotBuilder builder,
+    public RealtimeBroadcaster(IHubContext<PublicHub> publicHub, AdminLiveClients adminHub, LiveSnapshotBuilder builder,
         SettingsService settings, NodeRegistry registry, ProbeService probes, ILogger<RealtimeBroadcaster> logger) : base(logger, registry)
     {
         _publicHub = publicHub;
@@ -33,7 +33,7 @@ public sealed class RealtimeBroadcaster : SnmBackgroundService
             if (keys.Any(k => k.StartsWith("site.public", StringComparison.Ordinal) || k.StartsWith("public.", StringComparison.Ordinal) || k == "alert.offlineTimeoutSec"))
                 _metaChanges.Enqueue([]);
             if (keys.Any(k => k is "site.theme" or "site.themeOptions" or "site.publicTitle" or "site.publicSubtitle" || k.StartsWith("public.", StringComparison.Ordinal)))
-                _siteChanged = true;
+                Interlocked.Exchange(ref _siteChanged, 1);
         };
     }
 
@@ -42,7 +42,7 @@ public sealed class RealtimeBroadcaster : SnmBackgroundService
     protected override async Task TickAsync(DateTime now, CancellationToken ct)
     {
         var snap = _settings.Snapshot;
-        var publicItems = new List<PublicNodeLiveDto>();
+        var dirtyNodes = new List<NodeRuntime>();
         var adminItems = new List<AdminNodeLiveDto>();
 
         foreach (var node in Registry.All)
@@ -76,18 +76,20 @@ public sealed class RealtimeBroadcaster : SnmBackgroundService
             if (!node.Dirty) continue;
             node.Dirty = false;
             adminItems.Add(_builder.AdminLive(node));
-            if (_builder.IsPublicVisible(node)) publicItems.Add(_builder.PublicLive(node));
+            dirtyNodes.Add(node);
         }
 
         var ts = LiveSnapshotBuilder.UnixMs(now);
-        if (publicItems.Count > 0)
-            await _publicHub.Clients.All.SendAsync(PublicHubMethods.Batch, new PublicBatchDto { ServerTs = ts, Items = publicItems.ToArray() }, ct);
-        if (adminItems.Count > 0)
-            await _adminHub.Clients.All.SendAsync(AdminHubMethods.Batch, new AdminBatchDto { ServerTs = ts, Items = adminItems.ToArray() }, ct);
-
-        if (_siteChanged)
+        if (dirtyNodes.Count > 0)
         {
-            _siteChanged = false;
+            var batch = _builder.PublicBatch(dirtyNodes, now);
+            if (batch.Items.Length > 0) await _publicHub.Clients.All.SendAsync(PublicHubMethods.Batch, batch, ct);
+        }
+        if (adminItems.Count > 0)
+            await _adminHub.Current.SendAsync(AdminHubMethods.Batch, new AdminBatchDto { ServerTs = ts, Items = adminItems.ToArray() }, ct);
+
+        if (Interlocked.Exchange(ref _siteChanged, 0) != 0)
+        {
             // Site-level changes (title, theme, theme options) are delivered as a full snapshot so themes can re-render or reload.
             await _publicHub.Clients.All.SendAsync(PublicHubMethods.Snapshot, _builder.PublicSnapshot(now), ct);
         }
@@ -101,8 +103,8 @@ public sealed class RealtimeBroadcaster : SnmBackgroundService
                 if (batch.Length == 0) all = true;
                 foreach (var id in batch) ids.Add(id);
             }
-            await _publicHub.Clients.All.SendAsync(PublicHubMethods.NodesChanged, _builder.PublicNodes().Select(n => _builder.PublicNode(n, withHistory: false)).ToArray(), ct);
-            await _adminHub.Clients.All.SendAsync(AdminHubMethods.NodesChanged, all ? Array.Empty<int>() : ids.ToArray(), ct);
+            await _publicHub.Clients.All.SendAsync(PublicHubMethods.NodesChanged, _builder.PublicMetadata(), ct);
+            await _adminHub.Current.SendAsync(AdminHubMethods.NodesChanged, all ? Array.Empty<int>() : ids.ToArray(), ct);
         }
     }
 }

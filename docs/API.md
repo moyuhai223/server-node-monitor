@@ -99,6 +99,8 @@
 
 请求 `{ "refreshToken": "...", "all": false }`(两者可选)→ 撤销指定令牌;`all=true` 撤销该用户全部并 `TokenVersion++`。响应 `data: {}`。
 
+`all=true` 提交后，Master 从管理推送名单移除该用户旧版本的连接，并主动断开这些 `/hubs/admin` 连接；重新登录获取新令牌后可重新连接。单次退出不改变其他连接，也不影响公共页面和探针。
+
 ### 2.4 `GET /api/user/detail`
 
 ```json

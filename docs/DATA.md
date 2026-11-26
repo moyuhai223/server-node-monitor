@@ -334,7 +334,7 @@ MRR 计算(仪表盘):`Σ Price / BillingCycleMonths × rate[Currency]`(`Billing
 | `ReplacedByHash` TEXT(44) | 轮换链 | |
 | `UserAgent` TEXT(256) / `Ip` TEXT(45) | | |
 
-刷新 = 校验未撤销未过期 → 撤销旧行并写 `ReplacedByHash` → 新行。已撤销令牌再次使用 → 撤销该用户全部令牌(防重放)。
+刷新时，在同一数据库事务内按「未撤销且未过期」条件更新旧行并写入 `ReplacedByHash`。只有更新到一行的请求才能插入后继；插入失败则一并回滚。并发刷新至多一个请求成功。重复使用已撤销的令牌仍会撤销该用户所有未撤销的**刷新令牌**（包括刚签发的后继）；单纯过期或不存在的令牌不会影响其他会话。
 
 ---
 

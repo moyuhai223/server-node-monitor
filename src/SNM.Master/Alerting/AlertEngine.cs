@@ -35,11 +35,11 @@ public sealed class AlertEngine : SnmBackgroundService
     private readonly IDbContextFactory<SnmDbContext> _dbFactory;
     private readonly SettingsService _settings;
     private readonly NotificationDispatcher _dispatcher;
-    private readonly IHubContext<AdminHub> _adminHub;
+    private readonly AdminLiveClients _adminHub;
     private readonly ConcurrentDictionary<StateKey, State> _states = new();
     private readonly Lock _evalLock = new();
 
-    public AlertEngine(IDbContextFactory<SnmDbContext> dbFactory, SettingsService settings, NotificationDispatcher dispatcher, IHubContext<AdminHub> adminHub,
+    public AlertEngine(IDbContextFactory<SnmDbContext> dbFactory, SettingsService settings, NotificationDispatcher dispatcher, AdminLiveClients adminHub,
         NodeRegistry registry, ILogger<AlertEngine> logger) : base(logger, registry)
     {
         _dbFactory = dbFactory;
@@ -301,7 +301,7 @@ public sealed class AlertEngine : SnmBackgroundService
     {
         try
         {
-            await _adminHub.Clients.All.SendAsync(AdminHubMethods.Alert, new AdminAlertDto
+            await _adminHub.Current.SendAsync(AdminHubMethods.Alert, new AdminAlertDto
             {
                 Id = ev.Id, NodeId = ev.NodeId ?? 0, NodeName = ev.NodeName, Rule = (byte)ev.Rule, Status = (byte)ev.Status, Severity = (byte)ev.Severity,
                 Title = ev.Title, Message = ev.Message, Ts = LiveSnapshotBuilder.UnixMs(ev.ResolvedAt ?? ev.StartedAt),

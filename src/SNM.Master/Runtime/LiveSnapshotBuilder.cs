@@ -15,9 +15,10 @@ public sealed class LiveSnapshotBuilder(NodeRegistry registry, SettingsService s
 
     public IEnumerable<NodeRuntime> PublicNodes() => registry.All.Where(IsPublicVisible).OrderBy(n => n.Meta.SortOrder).ThenBy(n => n.Meta.Id);
 
-    public PublicSiteDto Site()
+    public PublicSiteDto Site() => Site(settings.Snapshot);
+
+    private static PublicSiteDto Site(SettingsSnapshot s)
     {
-        var s = settings.Snapshot;
         return new PublicSiteDto
         {
             Title = s.PublicTitle, Subtitle = s.PublicSubtitle, ShowSpecs = s.ShowSpecs, ShowTraffic = s.ShowTraffic, OfflineTimeoutSec = s.OfflineTimeoutSec,
@@ -25,14 +26,15 @@ public sealed class LiveSnapshotBuilder(NodeRegistry registry, SettingsService s
         };
     }
 
-    public PublicNodeLiveDto PublicLive(NodeRuntime n)
+    public PublicNodeLiveDto PublicLive(NodeRuntime n) => PublicLive(n, settings.Snapshot);
+
+    private static PublicNodeLiveDto PublicLive(NodeRuntime n, SettingsSnapshot s)
     {
         var live = n.Live;
         var meta = n.Meta;
         var diskTotal = n.DiskTotalMb();
         long diskUsed = 0;
         if (live is not null) foreach (var d in live.DiskUsedMb) diskUsed += d;
-        var billed = BillingPeriod.Billed(n.Traffic.PerRx, n.Traffic.PerTx, meta.TrafficCountMode);
         return new PublicNodeLiveDto
         {
             Id = n.Id,
@@ -43,7 +45,7 @@ public sealed class LiveSnapshotBuilder(NodeRegistry registry, SettingsService s
             RxBps = live?.RxBps ?? 0,
             TxBps = live?.TxBps ?? 0,
             UptimeSec = live?.UptimeSec ?? 0,
-            TrafficUsedBytes = (ulong)Math.Max(billed, 0),
+            TrafficUsedBytes = s.ShowTraffic ? (ulong)Math.Max(BillingPeriod.Billed(n.Traffic.PerRx, n.Traffic.PerTx, meta.TrafficCountMode), 0) : 0,
             Ts = live is null ? 0 : UnixMs(live.Ts),
         };
     }
@@ -60,7 +62,9 @@ public sealed class LiveSnapshotBuilder(NodeRegistry registry, SettingsService s
         };
     }
 
-    public PublicNodeDto PublicNode(NodeRuntime n, bool withHistory)
+    public PublicNodeDto PublicNode(NodeRuntime n, bool withHistory) => PublicNode(n, withHistory, settings.Snapshot);
+
+    private PublicNodeDto PublicNode(NodeRuntime n, bool withHistory, SettingsSnapshot s)
     {
         var meta = n.Meta;
         return new PublicNodeDto
@@ -69,22 +73,33 @@ public sealed class LiveSnapshotBuilder(NodeRegistry registry, SettingsService s
             Name = meta.PublicName,
             Cc = n.CountryCode,
             Order = meta.SortOrder,
-            Cores = (ushort)Math.Clamp(meta.CpuCores, 0, ushort.MaxValue),
-            MemTotalMb = (uint)Math.Clamp(meta.MemTotalMb, 0, uint.MaxValue),
-            DiskTotalMb = (ulong)Math.Max(n.DiskTotalMb(), 0),
-            TrafficLimitBytes = (ulong)Math.Max(meta.TrafficLimitBytes, 0),
-            Live = PublicLive(n),
+            Cores = s.ShowSpecs ? (ushort)Math.Clamp(meta.CpuCores, 0, ushort.MaxValue) : (ushort)0,
+            MemTotalMb = s.ShowSpecs ? (uint)Math.Clamp(meta.MemTotalMb, 0, uint.MaxValue) : 0,
+            DiskTotalMb = s.ShowSpecs ? (ulong)Math.Max(n.DiskTotalMb(), 0) : 0,
+            TrafficLimitBytes = s.ShowTraffic ? (ulong)Math.Max(meta.TrafficLimitBytes, 0) : 0,
+            Live = PublicLive(n, s),
             Hist = withHistory ? PublicHistory(n) : null,
             Probes = probes.Snapshot(n),
         };
     }
 
-    public PublicSnapshotDto PublicSnapshot(DateTime now) => new()
+    private PublicNodeDto[] PublicNodeList(bool withHistory, SettingsSnapshot s) =>
+        PublicNodes().Select(n => PublicNode(n, withHistory, s)).ToArray();
+
+    public PublicNodeDto[] PublicMetadata() => PublicNodeList(false, settings.Snapshot);
+
+    public PublicBatchDto PublicBatch(IEnumerable<NodeRuntime> dirty, DateTime now)
     {
-        ServerTs = UnixMs(now),
-        Site = Site(),
-        Nodes = PublicNodes().Select(n => PublicNode(n, withHistory: true)).ToArray(),
-    };
+        var s = settings.Snapshot;
+        return new() { ServerTs = UnixMs(now), Items = dirty.Where(IsPublicVisible).Select(n => PublicLive(n, s)).ToArray() };
+    }
+
+    public PublicSnapshotDto PublicSnapshot(DateTime now)
+    {
+        // Use one settings revision for the site's flags and every nested DTO in this message.
+        var s = settings.Snapshot;
+        return new() { ServerTs = UnixMs(now), Site = Site(s), Nodes = PublicNodeList(true, s) };
+    }
 
     public AdminNodeLiveDto AdminLive(NodeRuntime n)
     {
