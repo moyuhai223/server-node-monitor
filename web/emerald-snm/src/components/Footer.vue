@@ -21,10 +21,10 @@ const showFiling = computed(() => showIcp.value || showPolice.value)
       <div class="flex gap-1 items-center">
         Powered by
         <a
-          href="https://github.com/monitor-probe/monitor" target="_blank" rel="noopener noreferrer"
+          href="https://github.com/moyuhai223/server-node-monitor" target="_blank" rel="noopener noreferrer"
           class="transition-opacity hover:opacity-80"
         >
-          <span class="font-medium text-foreground">monitor</span>
+          <span class="font-medium text-foreground">SNM</span>
         </a>
       </div>
       <div class="flex flex-wrap gap-1 items-center">

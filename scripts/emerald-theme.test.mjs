@@ -43,3 +43,65 @@ test('release and Docker build the optional source with a frozen lockfile', asyn
   assert.match(docker,/pnpm install --frozen-lockfile --ignore-scripts/);
   assert.equal(workflow.split('package_json_file: web/emerald-snm/package.json').length - 1,2);
 });
+
+
+test('footer links to SNM source while preserving the Emerald upstream credit', async () => {
+  const footer = await readFile(new URL('../web/emerald-snm/src/components/Footer.vue', import.meta.url), 'utf8');
+  const [project, theme] = [...footer.matchAll(/<a\b([^>]+)>([\s\S]*?)<\/a>/g)];
+  assert.ok(project && theme, 'both footer credits remain present');
+  assert.match(project[1], /href="https:\/\/github\.com\/moyuhai223\/server-node-monitor"/);
+  assert.match(project[2], />SNM<\/span>/);
+  assert.match(theme[1], /href="https:\/\/github\.com\/binaryu\/monitor-theme-emerald"/);
+  assert.match(theme[2], />Emerald<\/span>/);
+  for (const link of [project, theme]) {
+    assert.match(link[1], /target="_blank"/);
+    assert.match(link[1], /rel="noopener noreferrer"/);
+  }
+});
+
+
+// Exercise the actual Vue card/list composables, not just their source strings.
+import { renderPingFixture } from './emerald-ping-fixture.mjs';
+import { fileURLToPath } from 'node:url';
+const emeraldSource = fileURLToPath(new URL('../web/emerald-snm/', import.meta.url));
+const probeNow = 1800000000000;
+const point = (state, us, ts = probeNow) => ({state, us, ts});
+const task = (points, extra = {}) => ({id:1, name:'ICMP 线路', interval:30, points, ...extra});
+const displayProbe = probes => renderPingFixture(emeraldSource, {fixture:'probe-card', now:probeNow, node:{id:11, probes}});
+
+test('probe card retains unsupported targets and explains the agent-side ICMP requirement', async () => {
+  const result = await displayProbe([task([point(0,12000,probeNow-30000),point(3,-1)])]);
+  assert.equal(result.availability,'unsupported'); assert.equal(result.hasData,false);
+  assert.equal(result.latency,'不支持'); assert.equal(result.loss,'不支持');
+  assert.deepEqual(result.networks,[{name:'ICMP 线路',latency:'不支持'}]);
+  assert.match(result.tooltips.latency,/CAP_NET_RAW/);
+});
+test('probe card distinguishes unconfigured targets from configured targets awaiting samples', async () => {
+  const empty = await displayProbe([]); const waiting = await displayProbe([task([])]);
+  assert.equal(empty.latency,'未配置探测'); assert.equal(empty.hasData,false);
+  assert.equal(waiting.latency,'等待测量'); assert.equal(waiting.loss,'等待测量');
+  assert.deepEqual(waiting.networks,[{name:'ICMP 线路',latency:'等待测量'}]);
+});
+test('probe card marks stale samples rather than presenting an old RTT', async () => {
+  const result = await displayProbe([task([point(0,12000,probeNow-120000)])]);
+  assert.equal(result.availability,'stale'); assert.equal(result.hasData,false);
+  assert.equal(result.latency,'已过期'); assert.equal(result.loss,'已过期');
+  assert.equal(result.networks[0].latency,'已过期');
+});
+test('probe card preserves real zero RTT and converts microseconds only once', async () => {
+  const zero = await displayProbe([task([point(0,0)])]);
+  const result = await displayProbe([task([point(0,0,probeNow-30000),point(0,40000)])]);
+  assert.equal(zero.latency,'0 ms'); assert.equal(zero.loss,'0.0%');
+  assert.equal(result.hasData,true); assert.equal(result.latency,'20 ms');
+  assert.equal(result.loss,'0.0%'); assert.equal(result.networks[0].latency,'20ms');
+});
+test('probe card counts timeouts and errors as 100% loss without inventing zero RTT', async () => {
+  const result = await displayProbe([task([point(1,-1,probeNow-30000),point(2,-1)])]);
+  assert.equal(result.hasData,true); assert.equal(result.latency,'未测量');
+  assert.equal(result.loss,'100.0%'); assert.equal(result.networks[0].latency,'--');
+});
+test('unsupported targets do not contaminate healthy target RTT or loss', async () => {
+  const result = await displayProbe([task([point(3,-1)]),task([point(0,32500)],{id:2,name:'TCP 线路'})]);
+  assert.equal(result.latency,'33 ms'); assert.equal(result.loss,'0.0%');
+  assert.deepEqual(result.networks,[{name:'ICMP 线路',latency:'不支持'},{name:'TCP 线路',latency:'33ms'}]);
+});

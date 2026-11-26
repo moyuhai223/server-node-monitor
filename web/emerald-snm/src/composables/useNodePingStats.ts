@@ -8,7 +8,10 @@ export interface NodePingHistoryPoint {
   loss: number | null
 }
 
+export type NodePingAvailability = 'unconfigured' | 'waiting' | 'unsupported' | 'stale' | 'measured'
+
 export interface NodePingStatsState {
+  availability: NodePingAvailability
   avgLatency: number
   avgLoss: number
   avgVolatility: number
@@ -27,13 +30,15 @@ interface PingRecord {
 interface PingTaskInfo {
   id: number
   name: string
+  availability: NodePingAvailability
 }
 
 export interface NodePingPerTaskStat {
   taskId: number
   name: string
   avgLatency: number
-  loss: number
+  loss: number | null
+  availability: NodePingAvailability
 }
 
 export const NODE_PING_BAR_COUNT = 10
@@ -68,6 +73,7 @@ interface TaskRecordSummary {
 
 function createEmptyStats(): NodePingStatsState {
   return {
+    availability: 'unconfigured',
     avgLatency: 0,
     avgLoss: 0,
     avgVolatility: 0,
@@ -164,9 +170,6 @@ function getPercentile(values: number[], percentile: number): number | null {
 function buildStats(records: PingRecord[], tasks: PingTaskInfo[]): NodePingStatsState {
   const includedTaskIds = getIncludedTaskIds(records)
 
-  if (!includedTaskIds.size)
-    return createEmptyStats()
-
   const filteredRecords = records.filter(record => includedTaskIds.has(record.task_id))
   const history = buildPingHistory(filteredRecords)
   const taskRecords = new Map<number, PingRecord[]>()
@@ -207,23 +210,26 @@ function buildStats(records: PingRecord[], tasks: PingTaskInfo[]): NodePingStats
   const avgVolatility = Math.round(average(volatilityValues))
   const hasData = history.some(point => point.loss !== null)
 
-  const taskNameMap = new Map(tasks.map(task => [task.id, task.name]))
-  const taskOrderMap = new Map(tasks.map((task, index) => [task.id, index]))
-
-  const perTaskStats: NodePingPerTaskStat[] = Array.from(taskRecords.entries())
-    .map(([taskId, recordsByTask]) => {
-      const valid = recordsByTask.filter(r => r.value >= 0).map(r => r.value)
-      const lost = recordsByTask.length - valid.length
-      return {
-        taskId,
-        name: taskNameMap.get(taskId) || `探针 #${taskId}`,
-        avgLatency: valid.length ? Math.round(average(valid)) : -1,
-        loss: recordsByTask.length ? Math.round((lost / recordsByTask.length) * 100) : 0,
-      }
-    })
-    .sort((a, b) => (taskOrderMap.get(a.taskId) ?? 0) - (taskOrderMap.get(b.taskId) ?? 0))
+  // Keep configured tasks even when there are no valid samples. Unsupported is not loss.
+  const perTaskStats: NodePingPerTaskStat[] = tasks.map((task) => {
+    const recordsByTask = taskRecords.get(task.id) || []
+    const valid = recordsByTask.filter(r => r.value >= 0).map(r => r.value)
+    const lost = recordsByTask.length - valid.length
+    return {
+      taskId: task.id,
+      name: task.name,
+      avgLatency: valid.length ? Math.round(average(valid)) : -1,
+      loss: recordsByTask.length ? Math.round((lost / recordsByTask.length) * 100) : null,
+      availability: task.availability,
+    }
+  })
+  const availability: NodePingAvailability = hasData ? 'measured'
+    : tasks.some(task => task.availability === 'waiting') ? 'waiting'
+      : tasks.some(task => task.availability === 'stale') ? 'stale'
+        : tasks.length ? 'unsupported' : 'unconfigured'
 
   return {
+    availability,
     avgLatency,
     avgLoss,
     avgVolatility,
@@ -270,11 +276,14 @@ async function loadNodePingRecords(entry: NodePingEntry, uuid: string, hours: nu
       const res = await runHistoryRequest(() => getNodeMetrics(uuid, { series: 'ping', hours, points: 60 }))
       const pingList = (res.ping || []).filter(p => !res.probeMeta?.[p.task_id]?.stale && (res.probeMeta?.[p.task_id]?.lastState ?? 0) < 3)
       const probeNames = res.probes || {}
-      const taskIds = [...new Set(pingList.map(p => p.task_id))]
-      const tasks: PingTaskInfo[] = taskIds.map(id => ({
-        id,
-        name: probeNames[String(id)] || `探针 #${id}`,
-      }))
+      const taskIds = [...new Set([...Object.keys(probeNames).map(Number), ...pingList.map(p => p.task_id)])]
+      const tasks: PingTaskInfo[] = taskIds.map((id) => {
+        const meta = res.probeMeta?.[id]
+        const availability: NodePingAvailability = meta?.lastState === 3 ? 'unsupported'
+          : meta?.stale && meta.lastState !== undefined ? 'stale'
+            : pingList.some(p => p.task_id === id) ? 'measured' : 'waiting'
+        return { id, name: probeNames[String(id)] || `探针 #${id}`, availability }
+      })
       const records: PingRecord[] = pingList.map(p => ({
         client: uuid,
         task_id: p.task_id,
@@ -333,7 +342,7 @@ export function useNodePingStats(
     if (!state)
       return createEmptyStats()
 
-    return state.records.length ? buildStats(state.records, state.tasks) : createEmptyStats()
+    return buildStats(state.records, state.tasks)
   })
 
   async function refresh(): Promise<void> {

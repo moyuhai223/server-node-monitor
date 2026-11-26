@@ -13,6 +13,21 @@ const RECENT_PING_RECORDS_QUERY_HOURS = 1
 // 三网延迟固定展示的记录数量
 const PING_NETWORK_DISPLAY_COUNT = 3
 
+const PING_AVAILABILITY_TEXT = {
+  unconfigured: '未配置探测',
+  waiting: '等待测量',
+  unsupported: '不支持',
+  stale: '已过期',
+  measured: '未测量',
+}
+const PING_AVAILABILITY_TOOLTIP = {
+  unconfigured: '未配置探测目标，请在后台系统设置 → 延时探测中添加。',
+  waiting: '探测目标已配置，等待 Agent 上报测量。',
+  unsupported: 'Agent 返回不支持；ICMP 请检查 CAP_NET_RAW / 运行环境，或改用 TCP 探测。',
+  stale: '探测数据已过期，等待 Agent 上报新样本。',
+  measured: '暂无有效测量。',
+}
+
 export interface NodePingBar {
   key: string
   className: string
@@ -74,8 +89,10 @@ function getLossToneClass(loss: number): string {
 function toNetworkDisplay(stat: NodePingPerTaskStat): NodePingNetworkDisplay {
   return {
     name: stat.name,
-    latency: stat.avgLatency >= 0 ? `${Math.round(stat.avgLatency)}ms` : '--',
-    toneClass: stat.avgLatency >= 0 ? getPingToneClass(stat.avgLatency) : 'text-rose-500',
+    latency: stat.availability !== 'measured' ? PING_AVAILABILITY_TEXT[stat.availability]
+      : stat.avgLatency >= 0 ? `${Math.round(stat.avgLatency)}ms` : '--',
+    toneClass: stat.availability !== 'measured' ? 'text-muted-foreground'
+      : stat.avgLatency >= 0 ? getPingToneClass(stat.avgLatency) : 'text-rose-500',
   }
 }
 
@@ -128,9 +145,7 @@ export function useNodePingDisplay(
         ? '加载失败'
         : !pingStatsEnabled.value
             ? '未启用记录'
-            : metric === 'latency'
-              ? 'N/A'
-              : 'N/A'
+            : PING_AVAILABILITY_TOOLTIP[pingStats.stats.value.availability]
 
     return Array.from({ length: NODE_PING_BAR_COUNT }, (_, index) => ({
       key: `${metric}-empty-${index}`,
@@ -149,7 +164,7 @@ export function useNodePingDisplay(
       return pingStats.avgLatency.value >= 0 ? `${Math.round(pingStats.avgLatency.value)} ms` : '未测量'
     if (pingStats.loading.value)
       return options.loadingDisplayText ?? '加载中'
-    return options.emptyDisplayText ?? '-'
+    return options.emptyDisplayText ?? PING_AVAILABILITY_TEXT[pingStats.stats.value.availability]
   })
 
   const lossDisplay = computed(() => {
@@ -157,14 +172,14 @@ export function useNodePingDisplay(
       return `${pingStats.avgLoss.value.toFixed(1)}%`
     if (pingStats.loading.value)
       return options.loadingDisplayText ?? '加载中'
-    return options.emptyDisplayText ?? '-'
+    return options.emptyDisplayText ?? PING_AVAILABILITY_TEXT[pingStats.stats.value.availability]
   })
 
   const latencyPanelTooltip = computed(() => {
     if (!pingStats.hasData.value) {
       if (pingStats.loading.value)
         return options.loadingPanelTooltipText?.latency ?? ''
-      return options.emptyPanelTooltipText?.latency ?? ''
+      return options.emptyPanelTooltipText?.latency ?? PING_AVAILABILITY_TOOLTIP[pingStats.stats.value.availability]
     }
     return pingStats.avgLatency.value >= 0 ? `平均延迟 ${Math.round(pingStats.avgLatency.value)} ms` : '无成功测量'
   })
@@ -173,7 +188,7 @@ export function useNodePingDisplay(
     if (!pingStats.hasData.value) {
       if (pingStats.loading.value)
         return options.loadingPanelTooltipText?.loss ?? ''
-      return options.emptyPanelTooltipText?.loss ?? ''
+      return options.emptyPanelTooltipText?.loss ?? PING_AVAILABILITY_TOOLTIP[pingStats.stats.value.availability]
     }
 
     const volatility = pingStats.avgVolatility.value > 0

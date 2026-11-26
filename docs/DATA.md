@@ -523,7 +523,8 @@ static long Delta(long cur, long prev, bool rebooted)
 | 时钟:服务端时间回拨 | `dtServer` 钳制 ≥ 0.2 s | 速率异常但流量不受影响 |
 | 重复/乱序心跳 | 已在 Hub 层按 `Seq` 丢弃(PROTOCOL R3) | 不进入引擎 |
 | `ulong` 计数器超过 `long.MaxValue` | 现实不可能(9.2 EB) | 强转后为负 → `cur < prev` 分支 → 0 |
-| 管理员修改 `TrafficResetDay`/时区 | 下一心跳 `EnsurePeriod` 得到新 `PeriodStart` | 当前账期行关闭(`Closed=1`),新账期从 0 开始;告警状态重置 |
+| 管理员修改限额或计费模式 | 配置与目标节点尚未落库的流量在同一个 SQLite 事务中保存 | 同一账期保留 Rx/Tx，按新规则计算用量；不重置计数器基线或账期告警 |
+| 管理员修改 `TrafficResetDay`/时区 | 提交时按新规则确定本地日和账期；旧账期起点变化时按旧规则封账 | 目标日或账期已有记录则恢复其累计，否则从 0 开始；仅账期切换标记告警重置。提交失败时保留原配置和待写计数 |
 | 管理员“重置本期流量” | `PerRx=PerTx=0`,`TrafficMonthly` 当前行清零,`UpdatedAt=now` | 基线不变 |
 | 节点禁用 | Agent 401,不再有心跳 | 基线保留;启用后 `cur ≥ prev` 精确补回 |
 

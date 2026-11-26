@@ -33,9 +33,12 @@ public sealed class MinuteFlushService(IDbContextFactory<SnmDbContext> dbFactory
 
     public async Task FlushAsync(DateTime now, bool includeOpenBuckets, CancellationToken ct)
     {
+        // Serialize collection as well as persistence: a waiting/cancelled flush must not detach work.
+        using var writeLease = await writeLock.AcquireAsync(ct);
         var currentBucket = UnixSeconds(now) / 60 * 60;
         var rows = new List<Metric1m>();
         var work = new List<NodeRuntime>();
+        var acknowledgements = new List<(NodeRuntime Node, ClosedPeriod[] Closed, (DateOnly, long, long)[] Days)>();
 
         foreach (var node in Registry.All)
         {
@@ -45,8 +48,7 @@ public sealed class MinuteFlushService(IDbContextFactory<SnmDbContext> dbFactory
                 if (node.Acc is { Samples: > 0 } acc && (includeOpenBuckets || acc.BucketTs < currentBucket))
                 {
                     rows.Add(acc.ToRow(node.Id));
-                    node.Acc = includeOpenBuckets ? null : node.Acc;
-                    if (!includeOpenBuckets) node.Acc = null; // completed bucket; next heartbeat opens a new one
+                    node.Acc = null; // the queued row owns these samples; new heartbeats open a new bucket
                 }
                 if (node.Traffic.Dirty || node.StateDirty) work.Add(node);
             }
@@ -56,7 +58,6 @@ public sealed class MinuteFlushService(IDbContextFactory<SnmDbContext> dbFactory
 
         try
         {
-            using var _ = await writeLock.AcquireAsync(ct);
             await using var db = await dbFactory.CreateDbContextAsync(ct);
             await using var tx = await db.Database.BeginTransactionAsync(ct);
 
@@ -78,7 +79,8 @@ public sealed class MinuteFlushService(IDbContextFactory<SnmDbContext> dbFactory
                     prevRx = t.PrevRx; prevTx = t.PrevTx; prevAt = t.PrevAt; bootPrev = t.BootTimeAtPrev; prevConn = t.PrevConnectionId;
                     day = t.Day; dayRx = t.DayRx; dayTx = t.DayTx; pStart = t.PeriodStart; pEnd = t.PeriodEnd; perRx = t.PerRx; perTx = t.PerTx;
                     closed = t.PendingClosed.ToArray(); pastDays = t.PendingDays.ToArray();
-                    t.PendingClosed.Clear(); t.PendingDays.Clear();
+                    // Keep rollovers until commit; heartbeats may append more while the database is writing.
+                    if (trafficDirty) acknowledgements.Add((node, closed, pastDays));
                     t.Dirty = false; node.StateDirty = false;
                     lastSeen = node.LastSeenAt; statusChanged = node.StatusChangedAt; status = node.Status; remoteIp = node.RemoteIp;
                 }
@@ -112,14 +114,27 @@ public sealed class MinuteFlushService(IDbContextFactory<SnmDbContext> dbFactory
 
             await db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
+            foreach (var (node, closed, pastDays) in acknowledgements)
+            {
+                lock (node.Sync)
+                {
+                    // Acknowledge only this transaction's entries, never concurrent rollovers/dirty flags.
+                    foreach (var entry in closed) node.Traffic.PendingClosed.Remove(entry);
+                    foreach (var entry in pastDays) node.Traffic.PendingDays.Remove(entry);
+                }
+            }
             _consecutiveFailures = 0;
             Logger.LogDebug("Flushed {Rows} metric rows and {Nodes} node states", rows.Count, work.Count);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex)
         {
             // Put the metric rows back so the next tick retries them; traffic/state dirty flags are re-raised.
             foreach (var row in rows) Registry.Get(row.NodeId)?.FlushQueue.Enqueue(row);
-            foreach (var node in work) { node.Traffic.Dirty = true; node.StateDirty = true; }
+            foreach (var node in work)
+            {
+                lock (node.Sync) { node.Traffic.Dirty = true; node.StateDirty = true; }
+            }
+            if (ex is OperationCanceledException) throw;
             _consecutiveFailures++;
             if (_consecutiveFailures >= 3) Logger.LogError(ex, "Minute flush failed {Count} times in a row", _consecutiveFailures);
             else Logger.LogWarning(ex, "Minute flush failed; will retry");

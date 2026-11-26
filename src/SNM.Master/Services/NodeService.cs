@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using SNM.Contracts;
 using SNM.Contracts.Dtos;
 using SNM.Master.Alerting;
@@ -179,18 +180,40 @@ public sealed class NodeService(
     public async Task<NodeDetailDto> UpdateAsync(int id, JsonElement body, CancellationToken ct)
     {
         var node = registry.Get(id) ?? throw ApiException.NodeNotFound();
-        await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var entity = await db.Nodes.FirstOrDefaultAsync(x => x.Id == id, ct) ?? throw ApiException.NodeNotFound();
-        var before = (entity.IntervalMs, entity.Enabled, entity.ExpiresAt, entity.TrafficResetDay, entity.TimeZoneId, entity.TrafficCountMode, entity.TrafficLimitBytes);
+        Node entity;
+        (int IntervalMs, bool Enabled, DateOnly? ExpiresAt) before;
+        // Read the latest policy under the same writer lease as minute flush and other PATCHes.
+        // Release it before pushing configuration or notifying other services.
+        using (await writeLock.AcquireAsync(ct))
+        {
+            await using var db = await dbFactory.CreateDbContextAsync(ct);
+            entity = await db.Nodes.FirstOrDefaultAsync(x => x.Id == id, ct) ?? throw ApiException.NodeNotFound();
+            before = (entity.IntervalMs, entity.Enabled, entity.ExpiresAt);
+            var oldPolicy = TrafficPolicy.From(entity);
 
-        var v = new Validator();
-        Apply(entity, body, v, isCreate: false);
-        v.ThrowIfInvalid();
-        if (await db.Nodes.AnyAsync(x => x.Id != id && x.PublicName == entity.PublicName, ct)) throw ApiException.Business(409, ApiCodes.NodeNameExists, "节点名称已存在");
-        entity.UpdatedAt = DateTime.UtcNow;
-        await db.SaveChangesAsync(ct);
-
-        registry.Upsert(entity);
+            var v = new Validator();
+            Apply(entity, body, v, isCreate: false);
+            v.ThrowIfInvalid();
+            if (await db.Nodes.AnyAsync(x => x.Id != id && x.PublicName == entity.PublicName, ct)) throw ApiException.Business(409, ApiCodes.NodeNameExists, "节点名称已存在");
+            entity.UpdatedAt = DateTime.UtcNow;
+            var newPolicy = TrafficPolicy.From(entity);
+            if (oldPolicy != newPolicy)
+            {
+                // Acquire SQLite's write transaction before blocking this node's heartbeat.
+                await using var tx = await db.Database.BeginTransactionAsync(ct);
+                lock (node.Sync)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    SaveTrafficPolicy(db, node, oldPolicy, newPolicy, tx, ct);
+                    registry.Upsert(entity);
+                }
+            }
+            else
+            {
+                await db.SaveChangesAsync(ct);
+                registry.Upsert(entity);
+            }
+        }
         var now = DateTime.UtcNow;
 
         if (before.IntervalMs != entity.IntervalMs && node.Connected) await PushConfigureAsync(node, ct);
@@ -206,12 +229,76 @@ public sealed class NodeService(
             tracker.Abort(conn);
         }
         if (before.ExpiresAt != entity.ExpiresAt) await alerts.EvaluateExpiryAsync(node, now, ct);
-        if (before.TrafficResetDay != entity.TrafficResetDay || before.TimeZoneId != entity.TimeZoneId || before.TrafficCountMode != entity.TrafficCountMode || before.TrafficLimitBytes != entity.TrafficLimitBytes)
-            await registry.ReloadTrafficAsync(node, ct);
         registry.RaiseNodesChanged(id);
         logger.LogInformation("Node {NodeId} ({Name}) updated", id, entity.PublicName);
         var ips = await LoadIpsAsync(id, ct);
         return ToDetail(node, ips.GetValueOrDefault(id) ?? [], includeNotes: true);
+    }
+
+    private readonly record struct TrafficPolicy(int ResetDay, string? Zone, int Mode, long Limit)
+    {
+        public static TrafficPolicy From(Node n) => new(n.TrafficResetDay, n.TimeZoneId, n.TrafficCountMode, n.TrafficLimitBytes);
+    }
+
+    // Called only for a policy edit, under the SQLite writer lease and node.Sync. SQLite work
+    // is synchronous here so no heartbeat can land between the final snapshot and publication.
+    private void SaveTrafficPolicy(SnmDbContext db, NodeRuntime node, TrafficPolicy oldPolicy, TrafficPolicy newPolicy,
+        IDbContextTransaction tx, CancellationToken ct)
+    {
+        var t = node.Traffic;
+        var now = DateTime.UtcNow;
+        var today = BillingPeriod.LocalToday(now, BillingPeriod.ResolveTimeZone(newPolicy.Zone, settings.Snapshot.TimeZoneId));
+        var start = BillingPeriod.PeriodStart(today, newPolicy.ResetDay);
+        var end = BillingPeriod.PeriodEnd(start, newPolicy.ResetDay);
+        var periodChanged = t.PeriodChanged || (t.PeriodStart != default && t.PeriodStart != start);
+
+        TrafficDaily Day(DateOnly date) => db.TrafficDaily.Find(node.Id, date)
+            ?? db.TrafficDaily.Add(new TrafficDaily { NodeId = node.Id, Date = date }).Entity;
+        TrafficMonthly Month(DateOnly key) => db.TrafficMonthly.Find(node.Id, key)
+            ?? db.TrafficMonthly.Add(new TrafficMonthly { NodeId = node.Id, PeriodStart = key }).Entity;
+        void SaveDay(DateOnly date, long rx, long bytesTx)
+        {
+            var day = Day(date);
+            (day.RxBytes, day.TxBytes, day.UpdatedAt) = (rx, bytesTx, now);
+        }
+        void SetPolicy(TrafficMonthly month, DateOnly until, TrafficPolicy policy, bool closed)
+        {
+            month.PeriodEnd = until; month.Closed = closed; month.UpdatedAt = now;
+            month.ResetDay = policy.ResetDay; month.LimitBytes = policy.Limit; month.CountMode = policy.Mode;
+            month.BilledBytes = BillingPeriod.Billed(month.RxBytes, month.TxBytes, policy.Mode);
+        }
+        void CloseMonth(DateOnly key, DateOnly until, long rx, long bytesTx)
+        {
+            var month = Month(key);
+            (month.RxBytes, month.TxBytes) = (rx, bytesTx);
+            SetPolicy(month, until, oldPolicy, closed: true);
+        }
+
+        foreach (var (date, rx, bytesTx) in t.PendingDays) SaveDay(date, rx, bytesTx);
+        if (t.Day != default) SaveDay(t.Day, t.DayRx, t.DayTx);
+        foreach (var closed in t.PendingClosed) CloseMonth(closed.PeriodStart, closed.PeriodEnd, closed.Rx, closed.Tx);
+        if (t.PeriodStart != default && t.PeriodStart != start) CloseMonth(t.PeriodStart, t.PeriodEnd, t.PerRx, t.PerTx);
+        // Find also sees rows staged above. When returning to an existing bucket, reuse its
+        // absolute totals; a genuinely new bucket starts at zero. Never add a snapshot twice.
+        var activeDay = Day(today);
+        activeDay.UpdatedAt = now;
+        var activeMonth = Month(start);
+        if (t.PeriodStart == start) (activeMonth.RxBytes, activeMonth.TxBytes) = (t.PerRx, t.PerTx);
+        SetPolicy(activeMonth, end, newPolicy, closed: false);
+
+        var state = db.TrafficStates.Find(node.Id) ?? db.TrafficStates.Add(new TrafficState { NodeId = node.Id }).Entity;
+        (state.PrevRx, state.PrevTx) = (t.PrevRx, t.PrevTx);
+        state.PrevAtUtc = t.PrevAt == DateTime.MinValue ? null : t.PrevAt;
+        state.BootTimeAtPrevUtc = t.BootTimeAtPrev; state.PrevConnectionId = t.PrevConnectionId; state.UpdatedAt = now;
+
+        ct.ThrowIfCancellationRequested();
+        db.SaveChanges(); // includes the tracked node configuration
+        ct.ThrowIfCancellationRequested();
+        tx.Commit();
+        // No cancellable step after commit. On failure all pending work and live metadata remain intact.
+        TrafficEngine.LoadFrom(t, state, activeMonth, activeDay, today, newPolicy.ResetDay);
+        t.PeriodChanged = periodChanged;
+        node.Dirty = true;
     }
 
     public async Task DeleteAsync(int id, CancellationToken ct)
