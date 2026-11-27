@@ -26,10 +26,24 @@ jobs:
         with:
           package_json_file: web/emerald-snm/package.json
           run_install: false
+      - name: Verify Linux agent ICMP install policy and local socket permission
+        run: SNM_TEST_SYSTEMD=1 bash scripts/test-agent-icmp-install.sh
       - name: Build web assets
         run: bash scripts/build-web.sh
       - name: Test public probe SDK and theme statistics
         run: node --test scripts/probes.test.mjs scripts/emerald-theme.test.mjs
+      - name: Package installable Emerald theme
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          python3 scripts/pack-emerald-upload.py
+          cd artifacts
+          for zip in snm-theme-emerald-snm-*.zip; do sha256sum "$zip" > "$zip.sha256"; done
+      - uses: actions/upload-artifact@v4
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          name: snm-theme-emerald-snm
+          path: artifacts/snm-theme-emerald-snm-*.zip*
+          if-no-files-found: error
       - name: Build solution
         run: dotnet build ServerNodeMonitor.slnx -c Release
       - name: Test
@@ -114,6 +128,10 @@ jobs:
           path: dist
           merge-multiple: true
           pattern: snm-master-*
+      - uses: actions/download-artifact@v4
+        with:
+          name: snm-theme-emerald-snm
+          path: dist
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/*

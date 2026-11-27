@@ -183,7 +183,23 @@ if [ "$DRY_RUN" = 1 ]; then echo "--- $ENV_FILE (dry run) ---"; sed "s/^SNM_KEY=
 run install -m 600 -o root -g root "$TMP/agent.env" "$ENV_FILE"
 
 # ---------------------------------------------------------------- systemd unit
-cat > "$TMP/unit" <<'UNIT'
+# PID 1 (the system service manager), not the installer shell, must be able to
+# pass CAP_NET_RAW to the unprivileged agent. Missing/malformed masks fail closed.
+can_grant_net_raw() {
+  local field mask
+  for field in CapBnd CapPrm; do
+    mask=$(awk -v key="$field:" '$1 == key {print $2; exit}' /proc/1/status 2>/dev/null) || return 1
+    [[ $mask =~ ^[[:xdigit:]]{4,}$ ]] || return 1
+    (( (16#${mask: -4} & 0x2000) != 0 )) || return 1  # Linux CAP_NET_RAW is bit 13
+  done
+}
+icmp_cap=
+if can_grant_net_raw; then
+  icmp_cap=CAP_NET_RAW
+else
+  warn "CAP_NET_RAW unavailable to systemd: ICMP may be unsupported; TCP and monitoring remain enabled."
+fi
+cat > "$TMP/unit" <<UNIT
 [Unit]
 Description=Server Node Monitor Agent
 After=network-online.target
@@ -206,8 +222,8 @@ ProtectKernelTunables=true
 ProtectControlGroups=true
 RestrictSUIDSGID=true
 LockPersonality=true
-CapabilityBoundingSet=
-AmbientCapabilities=
+CapabilityBoundingSet=$icmp_cap
+AmbientCapabilities=$icmp_cap
 
 [Install]
 WantedBy=multi-user.target

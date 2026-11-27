@@ -26,8 +26,8 @@ export interface StatusRecord {
   gpu: number
   ram: number
   ram_total: number
-  swap: number
-  swap_total: number
+  swap?: number
+  swap_total?: number
   load: number | null
   temp: number
   disk: number
@@ -233,8 +233,8 @@ function convertMetricsToStatusRecords(metrics: MetricsPoint[], step?: number): 
     gpu: 0,
     ram: p.mem_used,
     ram_total: node?.ram_total || node?.mem_total || 0,
-    swap: p.swap_used ?? 0,
-    swap_total: node?.swap_total || 0,
+    swap: p.swap_used,
+    swap_total: node?.swap_total,
     load: (p as unknown as { load?: number | null }).load ?? null,
     temp: 0,
     disk: p.disk_used,
@@ -546,10 +546,10 @@ const memoryChartOption = computed(() => ({
 
       const ramUsed = record.ram ?? 0
       const ramTotal = record.ram_total ?? nodeInfo.value?.mem_total ?? 0
-      const swapUsed = record.swap ?? 0
+      const swapUsed = record.swap
       const swapTotal = record.swap_total ?? nodeInfo.value?.swap_total ?? 0
       const ramPercent = ramTotal > 0 ? ((ramUsed / ramTotal) * 100).toFixed(1) : '0'
-      const swapPercent = swapTotal > 0 ? ((swapUsed / swapTotal) * 100).toFixed(1) : '0'
+      const swapPercent = swapUsed != null && swapTotal > 0 ? ` (${((swapUsed / swapTotal) * 100).toFixed(1)}%)` : ''
 
       const timeStr = formatTimeForTooltip(record.time, selectedHours.value || 1)
       let html = `<div style="font-weight:600;margin-bottom:6px;color:${chartThemeColors.value.textSecondary}">${timeStr}</div>`
@@ -560,8 +560,8 @@ const memoryChartOption = computed(() => ({
         if (item.seriesName === 'RAM') {
           html += `<div style="display:flex;align-items:center">${colorDot}<span>RAM</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${formatBytes(ramUsed)} (${ramPercent}%)</span></div>`
         }
-        else if (item.seriesName === 'Swap') {
-          html += `<div style="display:flex;align-items:center">${colorDot}<span>Swap</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${formatBytes(swapUsed)} (${swapPercent}%)</span></div>`
+        else if (item.seriesName === 'Swap' && swapUsed != null) {
+          html += `<div style="display:flex;align-items:center">${colorDot}<span>Swap</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${formatBytes(swapUsed)}${swapPercent}</span></div>`
         }
       }
       html += '</div>'
@@ -601,14 +601,14 @@ const memoryChartOption = computed(() => ({
         },
       },
     },
-    {
+    ...(chartData.value.some(r => r.swap != null) ? [{
       name: 'Swap',
       type: 'line',
-      data: chartData.value.map(r => r.swap ?? 0),
+      data: chartData.value.map(r => r.swap ?? null),
 
       showSymbol: false,
       lineStyle: { width: 1.5, color: chartColors.secondary, cap: 'round' as const },
-    },
+    }] : []),
   ],
 }))
 

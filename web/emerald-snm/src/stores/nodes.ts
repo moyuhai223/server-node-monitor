@@ -36,7 +36,7 @@ export interface NodeData {
   public_remark: string
   last_seen_ago?: number | null
   mem_total: number
-  swap_total: number
+  swap_total?: number
   disk_total: number
   version?: string
   weight: number
@@ -63,7 +63,7 @@ export interface NodeData {
   mem_percent?: number
   disk_percent?: number
   ram_total: number
-  swap: number
+  swap?: number
   load: number
   load5: number
   load15: number
@@ -154,7 +154,7 @@ export function convertMonitorNodeToNodeData(node: MonitorNode): NodeData {
     public_remark: node.public_remark || node.remark || '',
     last_seen_ago: node.last_seen_ago !== undefined ? node.last_seen_ago : null,
     mem_total: m?.mem_total ?? node.mem_total ?? 0,
-    swap_total: m?.swap_total ?? node.swap_total ?? 0,
+    swap_total: m?.swap_total ?? node.swap_total,
     disk_total: m?.disk_total ?? node.disk_total ?? 0,
     version: node.agent_version,
     weight: node.sort ?? 0,
@@ -180,7 +180,7 @@ export function convertMonitorNodeToNodeData(node: MonitorNode): NodeData {
     mem_percent: hasMetrics ? m.mem_percent : 0,
     disk_percent: hasMetrics ? m.disk_percent : 0,
     ram_total: hasMetrics ? m.mem_total : (node.mem_total ?? 0),
-    swap: hasMetrics ? m.swap_used : 0,
+    swap: hasMetrics ? m.swap_used : undefined,
     load: hasMetrics && m.load?.length ? m.load[0] : 0,
     load5: hasMetrics && m.load?.length ? m.load[1] : 0,
     load15: hasMetrics && m.load?.length ? m.load[2] : 0,

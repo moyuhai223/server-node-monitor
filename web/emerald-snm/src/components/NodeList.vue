@@ -279,7 +279,7 @@ function getRowTransitionStyle(index: number): Record<string, string> {
 
               <!-- 内存 -->
               <div v-else-if="col.key === 'mem'" class="group">
-                <DataTooltip placement="top" class="block" :content-class="[!node.swap && '!hidden']">
+                <DataTooltip placement="top" class="block" :disabled="node.swap == null || (node.swap === 0 && !node.swap_total)">
                   <div class="space-y-1">
                     <div class="text-[10px] text-muted-foreground truncate">
                       <span class="inline" :class="appStore.publicSettings?.theme_settings?.snmShowSpecs !== false && 'group-hover:hidden'">

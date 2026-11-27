@@ -19,15 +19,11 @@ Agent 通常在 30 秒内获取配置；正在进行的批次可能使其延后�
 
 ## Linux ICMP 权限
 
-TCP 无需额外权限。ICMP 需要 raw socket 能力；默认加固安装可能未授予 `CAP_NET_RAW`，这时显示“不支持”，可使用 TCP。若需要 ICMP，可由运维为 `snm-agent` 的 systemd 服务配置：
+Linux 一键安装脚本会在 systemd 可授予权限时，将 `CAP_NET_RAW` 仅授予 `snm-agent.service`。新装后可以直接使用 ICMP；已有节点用新版安装脚本重新执行一次即可，无需卸载。使用后台生成的一键命令时，先更新 Master（模板内嵌在 Master 中）；只切换线路或只更新 Agent 二进制不会更新服务权限。
 
-```ini
-[Service]
-CapabilityBoundingSet=CAP_NET_RAW
-AmbientCapabilities=CAP_NET_RAW
-```
+Agent 仍使用 `snm-agent` 非 root 用户和 `NoNewPrivileges=true`，不会对二进制执行 `setcap` 或修改系统全局参数。若容器或宿主不允许授予 `CAP_NET_RAW`，安装时会提示并保留 TCP 和性能监控；不需要开启特权容器。目标屏蔽 ICMP 仍可能超时，不代表安装失败。
 
-应用服务配置后重启 Agent。代码在 Unix 上先检查 raw socket 权限，避免 .NET 在缺少权限时使用外部 ping 可执行文件。没有自动修改主机权限的行为。
+可在节点上运行 `systemctl show snm-agent -p CapabilityBoundingSet -p AmbientCapabilities` 核对，启用时两项都应含 `cap_net_raw`。如需保持仅 TCP，可在管理员自定义的 systemd drop-in 中将这两项置空，执行 `systemctl daemon-reload` 后重启服务。安装脚本只更新主 unit，不改管理员的 drop-in。
 
 ## 协议与管理接口
 

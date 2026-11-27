@@ -11,7 +11,7 @@ test('history has truthful units and reconstructs only unknown SDK timestamps',(
 test('probe failures are gaps, real zero RTT is valid and unsupported is excluded',()=>{const n={...node,probes:[{id:10,name:'SG TCP',interval:10,points:[{ts:now-3000,state:0,us:0},{ts:now-2000,state:1,us:0},{ts:now-1000,state:2,us:0},{ts:now,state:3,us:0}]}]};const result=toMetricsResponse(n,now);assert.equal(result.ping.length,3);assert.equal(result.ping[0].latency,0);assert.equal(result.ping[1].latency,null);assert.equal(result.ping[2].latency,null);assert.equal(result.loss[10],200/3);});
 test('no measurements do not become zero loss or zero latency',()=>{const result=probeSummary({points:[]},now);assert.equal(result.failure,null);assert.equal(result.average,null);assert.equal(result.stale,true);const unsupported=toMetricsResponse({...node,probes:[{id:3,name:'unsupported',points:[{state:3,ts:now,us:0}]}]},now);assert.equal(unsupported.loss[3],undefined);assert.equal(unsupported.ping.length,0);});
 test('stale probes are recognized relative to the configured interval',()=>{const probe={interval:10,points:[{ts:now-60000,state:0,us:10000}]};assert.equal(probeSummary(probe,now).stale,true);assert.equal(probeSummary({...probe,interval:60},now).stale,false);});
-test('SNM entry is SDK-only and hash routing preserves root and preview refreshes',async()=>{const api=await readFile(new URL('../web/emerald-snm/src/utils/api.ts',import.meta.url),'utf8');const routes=await readFile(new URL('../web/emerald-snm/src/router/index.ts',import.meta.url),'utf8');const manifest=JSON.parse(await readFile(new URL('../web/emerald-snm/theme.json',import.meta.url),'utf8'));assert.match(api,/createClient\(\{ theme: 'emerald'/);assert.doesNotMatch(api,/fetch\(/);assert.match(routes,/createWebHashHistory\(\)/);assert.equal(manifest.id,'emerald');assert.equal(manifest.sdk,1);});
+test('SNM entry is SDK-only and hash routing preserves root and preview refreshes',async()=>{const api=await readFile(new URL('../web/emerald-snm/src/utils/api.ts',import.meta.url),'utf8');const routes=await readFile(new URL('../web/emerald-snm/src/router/index.ts',import.meta.url),'utf8');const manifest=JSON.parse(await readFile(new URL('../web/emerald-snm/theme.json',import.meta.url),'utf8'));assert.match(api,/theme: document\.documentElement\.dataset\.snmTheme \|\| 'emerald'/);assert.doesNotMatch(api,/fetch\(/);assert.match(routes,/createWebHashHistory\(\)/);assert.equal(manifest.id,'emerald');assert.equal(manifest.sdk,1);});
 
 test('hidden specs keep truthful live percentages without exposing hardware sizes', () => {
   const result = toMonitorNode(node, {showSpecs:false});
@@ -104,4 +104,19 @@ test('unsupported targets do not contaminate healthy target RTT or loss', async 
   const result = await displayProbe([task([point(3,-1)]),task([point(0,32500)],{id:2,name:'TCP 线路'})]);
   assert.equal(result.latency,'33 ms'); assert.equal(result.loss,'0.0%');
   assert.deepEqual(result.networks,[{name:'ICMP 线路',latency:'不支持'},{name:'TCP 线路',latency:'33ms'}]);
+});
+
+
+test('Emerald touch: ordinary taps navigate; only enabled info taps consume clicks', async () => {
+  const { tooltipBehavior } = await import('./emerald-tooltip-fixture.mjs');
+  const result = await tooltipBehavior(emeraldSource);
+  const closed = { hover: false, open: false, stopped: false };
+  assert.deepEqual(result, {ordinary: closed, info: {hover:false, open:true, stopped:true}, cancelled: closed, disabled: closed, mouse: {hover:true, open:false, stopped:false}});
+});
+
+test('SNM does not synthesize Swap data that the public protocol does not export', () => {
+  const current = toMonitorNode(node);
+  assert.equal(current.swap_total, undefined);
+  assert.equal(current.metrics.swap_used, undefined);
+  assert.ok(toMetricsResponse(node, now).metrics.every(sample => sample.swap_used == null));
 });

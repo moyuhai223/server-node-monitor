@@ -121,7 +121,7 @@ function openPingDialog() {
               <span>{{ memPercentage.toFixed(1) }}%</span>
             </div>
             <ProgressThin :percentage="memPercentage" :status="memStatus" :height="4" />
-            <DataTooltip v-if="appStore.publicSettings?.theme_settings?.snmShowSpecs !== false" placement="top" class="block" :content-class="[!props.node.swap && '!hidden']">
+            <DataTooltip v-if="appStore.publicSettings?.theme_settings?.snmShowSpecs !== false" placement="top" class="block" :disabled="props.node.swap == null || (props.node.swap === 0 && !props.node.swap_total)">
               <div class="text-[11px] text-muted-foreground truncate">
                 {{ formatBytes(props.node.ram ?? 0) }} / {{ formatBytes(props.node.mem_total ?? 0) }}
               </div>

@@ -28,8 +28,8 @@ export interface Metrics {
   mem_used: number
   mem_percent?: number
   disk_percent?: number
-  swap_total: number
-  swap_used: number
+  swap_total?: number
+  swap_used?: number
   disk_total: number
   disk_used: number
   net_rx: number
@@ -61,7 +61,7 @@ export interface MonitorNode {
   cpu_name: string
   cpu_cores: number
   mem_total: number
-  swap_total: number
+  swap_total?: number
   disk_total: number
   agent_version: string
   price: number
@@ -128,7 +128,7 @@ export interface NodeMetricsResponse {
 }
 
 
-export const client = createClient({ theme: 'emerald', historyPoints: 60 })
+export const client = createClient({ theme: document.documentElement.dataset.snmTheme || 'emerald', historyPoints: 60 })
 const listeners = new Set<() => void>()
 export function subscribeUpdates(fn: () => void): () => void { listeners.add(fn); return () => { listeners.delete(fn) } }
 for (const name of ['snapshot', 'nodes', 'update', 'probes']) client.on(name, () => { for (const fn of listeners) fn() })

@@ -847,7 +847,7 @@ onUnmounted(stopUpdates)
                 <span v-else-if="task.lastState === 1 || task.lastState === 2" class="text-xs text-rose-500">最近失败</span>
                 <span v-else-if="task.lastState === 3" class="text-xs text-muted-foreground">不支持</span>
                 <div class="flex-1" />
-                <DataTooltip placement="left" content-class="!rounded p-3 w-60 backdrop-blur">
+                <DataTooltip placement="left" touch-trigger="tap" content-class="!rounded p-3 w-60 backdrop-blur">
                   <Button variant="ghost" size="icon-xs" class="text-slate-500" @click.stop>
                     <Icon icon="carbon:information" :width="14" :height="14" />
                   </Button>
@@ -937,6 +937,7 @@ onUnmounted(stopUpdates)
             </Button>
             <DataTooltip
               content="使用 EWMA 算法平滑数据并过滤突变值"
+              touch-trigger="tap"
               placement="top"
               :content-class="pickSurfaceClass('whitespace-nowrap text-[11px]', 'whitespace-nowrap text-[11px] backdrop-blur-xl')"
             >
