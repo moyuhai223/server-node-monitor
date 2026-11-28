@@ -86,12 +86,23 @@ function openPingDialog() {
     </template>
 
     <template #header-extra>
-      <div class="flex gap-2 items-center">
-        
+      <div class="flex min-w-0 gap-2 items-center">
         <img
           v-if="hasRegion(props.node.region)" :src="getFlagSrc(props.node.region)"
           :alt="getRegionDisplayName(props.node.region)" class="size-5 shrink-0"
         >
+        <div
+          v-if="props.node.os"
+          class="flex min-w-0 max-w-32 items-center gap-1 text-xs text-muted-foreground"
+          :title="`操作系统：${getOSName(props.node.os)}`"
+        >
+          <img
+            :src="getOSImage(props.node.os)"
+            :alt="getOSName(props.node.os)"
+            class="size-4 shrink-0 object-contain"
+          >
+          <span class="truncate">{{ getOSName(props.node.os) }}</span>
+        </div>
       </div>
     </template>
 

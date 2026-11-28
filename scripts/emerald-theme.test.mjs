@@ -45,6 +45,12 @@ test('release and Docker build the optional source with a frozen lockfile', asyn
 });
 
 
+test('node card shows the host operating system beside the region flag', async () => {
+  const card = await readFile(new URL('../web/emerald-snm/src/components/NodeCard.vue', import.meta.url), 'utf8');
+  assert.match(card, /getOSImage\(props\.node\.os\)/);
+  assert.match(card, /getOSName\(props\.node\.os\)/);
+  assert.match(card, /操作系统：\$\{getOSName\(props\.node\.os\)\}/);
+});
 test('footer links to SNM source while preserving the Emerald upstream credit', async () => {
   const footer = await readFile(new URL('../web/emerald-snm/src/components/Footer.vue', import.meta.url), 'utf8');
   const [project, theme] = [...footer.matchAll(/<a\b([^>]+)>([\s\S]*?)<\/a>/g)];
