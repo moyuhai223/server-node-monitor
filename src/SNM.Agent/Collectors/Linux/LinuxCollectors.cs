@@ -364,12 +364,7 @@ internal sealed class LinuxSystemInfo : ISystemInfo
 
     private static string? ReadOsRelease()
     {
-        foreach (var line in SafeReadLines("/etc/os-release"))
-        {
-            if (!line.StartsWith("PRETTY_NAME=", StringComparison.Ordinal)) continue;
-            return line[12..].Trim().Trim('"');
-        }
-        return null;
+        return OsReleaseParser.Parse(SafeReadLines("/etc/os-release"));
     }
 
     private static string DetectVirt()

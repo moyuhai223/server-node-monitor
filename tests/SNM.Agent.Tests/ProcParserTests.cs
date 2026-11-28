@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using SNM.Agent.Collectors.Linux;
+using SNM.Agent.Collectors.Shared;
 
 namespace SNM.Agent.Tests;
 
@@ -98,6 +99,30 @@ public class ProcParserTests
         Assert.Equal(2, cores);
         (model, _) = LinuxSystemInfo.ParseCpuInfo(["processor\t: 0", "Hardware\t: BCM2835"]);
         Assert.Equal("BCM2835", model);
+    }
+
+    [Fact]
+    public void OsReleaseNormalizesCommonDistributions()
+    {
+        Assert.Equal("Debian 12", OsReleaseParser.Parse(["ID=debian", "NAME=\"Debian GNU/Linux\"", "VERSION_ID=\"12\"", "PRETTY_NAME=\"Debian GNU/Linux 12 (bookworm)\""]));
+        Assert.Equal("Ubuntu 24.04", OsReleaseParser.Parse(["ID=ubuntu", "VERSION_ID=24.04", "PRETTY_NAME=Ubuntu 24.04.3 LTS"]));
+        Assert.Equal("Alpine Linux 3.20", OsReleaseParser.Parse(["ID=alpine", "VERSION_ID=3.20"]));
+    }
+
+    [Fact]
+    public void OsReleaseMapsAliasesAndUnknownNames()
+    {
+        Assert.Equal("AlmaLinux 9.5", OsReleaseParser.Parse(["ID=alma", "VERSION_ID=9.5"]));
+        Assert.Equal("openSUSE 2025", OsReleaseParser.Parse(["ID=opensuse-tumbleweed", "VERSION_ID=2025"]));
+        Assert.Equal("ExampleOS 1.0", OsReleaseParser.Parse(["ID=example", "NAME=ExampleOS", "VERSION_ID=1.0"]));
+    }
+
+    [Fact]
+    public void OsReleaseHandlesQuotedMalformedAndMissingFields()
+    {
+        Assert.Equal("Ubuntu 22.04 LTS (Jammy Jellyfish)", OsReleaseParser.Parse(["# comment", "ID=ubuntu", "PRETTY_NAME=\"Ubuntu 22.04 LTS (Jammy Jellyfish)\"", "BROKEN"]));
+        Assert.Equal("Debian GNU/Linux 12", OsReleaseParser.Parse(["NAME=Debian GNU/Linux", "PRETTY_NAME=Debian GNU/Linux 12"]));
+        Assert.Null(OsReleaseParser.Parse(["# no usable fields", "BROKEN", "=invalid"]));
     }
 
     [Fact]
